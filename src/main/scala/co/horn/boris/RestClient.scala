@@ -32,7 +32,7 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
   }.toVector
 
   var idx = 0
-  val maxTries = 10
+  val maxTries = servers.size + 1 // Run once through the server pool before giving up
 
   def next = {
     val next = pool(idx)
@@ -57,9 +57,11 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
         .flatMap {
           case (Success(r: HttpResponse), _) ⇒ Future.successful(r)
           case (Failure(f), p) if tries < maxTries ⇒
-            println(s"Failed request to ${request.uri} failed on ${servers(p)}")
+            system.log.warning(s"Request to ${request.uri} failed on ${servers(p)}: Failure was ${f.getMessage}")
             execHelper(req, tries + 1)
-          case (Failure(f), _) ⇒ Future.failed(f)
+          case (Failure(f), _) if tries >= maxTries ⇒
+            system.log.error(s"Request to ${request.uri} failed (no servers available)")
+            Future.failed(NoServersResponded)
         }
     }
 

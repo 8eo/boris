@@ -56,7 +56,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfter with ScalaFutures with 
 
     it("catches a failed server") {
       servers(1).unbind.futureValue
-      Thread.sleep(1000)
+      Thread.sleep(2000)
       val pool = RestClient(uri, ConnectionPoolSettings(system))
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
@@ -64,6 +64,11 @@ class RoundRobinTest extends FunSpec with BeforeAndAfter with ScalaFutures with 
       ret.toSet should contain only("0", "2", "3", "4")
     }
 
+
+    it("fails if no servers are able to serve the request") {
+      val pool = RestClient(Seq(Uri("http://localhost:10123")), ConnectionPoolSettings(system))
+      pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).failed.futureValue shouldBe NoServersResponded
+    }
   }
 
 }
