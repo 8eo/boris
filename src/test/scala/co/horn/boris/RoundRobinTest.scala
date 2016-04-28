@@ -6,7 +6,7 @@ package co.horn.boris
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.model.{Uri, StatusCodes}
+import akka.http.scaladsl.model.{ Uri, StatusCodes }
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.http.scaladsl.unmarshalling.Unmarshal
@@ -14,9 +14,9 @@ import akka.http.scaladsl.client.RequestBuilding._
 import akka.stream.ActorMaterializer
 import org.scalatest.concurrent.ScalaFutures
 
-import org.scalatest.time.{Seconds, Span}
+import org.scalatest.time.{ Seconds, Span }
 import scala.concurrent.ExecutionContext.Implicits.global
-import org.scalatest.{Matchers, BeforeAndAfter, FunSpec}
+import org.scalatest.{ Matchers, BeforeAndAfter, FunSpec }
 
 import scala.concurrent.Future
 
@@ -44,7 +44,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfter with ScalaFutures with 
     servers.foreach(_.unbind.futureValue)
   }
 
-  describe("The round robin scheduler"){
+  describe("The round robin scheduler") {
 
     it("visits the servers in turn") {
       val pool = RestClient(uri, ConnectionPoolSettings(system))
@@ -53,6 +53,16 @@ class RoundRobinTest extends FunSpec with BeforeAndAfter with ScalaFutures with 
       }
       (0 until 5).foreach(i ⇒ ret.count(_ == i.toString) shouldBe 4)
     }
+
+    it("catches a failed server") {
+      servers(1).unbind.futureValue
+      val pool = RestClient(uri, ConnectionPoolSettings(system))
+      val ret = (0 until 20).map { i ⇒
+        pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
+      }
+      (0 until 5).foreach(i ⇒ ret.count(_ == i.toString) shouldBe 4)
+    }
+
   }
 
 }
