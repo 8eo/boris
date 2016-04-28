@@ -20,6 +20,7 @@ import scala.util.{Failure, Success}
 case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(implicit val system: ActorSystem, implicit val materializer: ActorMaterializer) {
 
   import system.dispatcher
+  import java.util.concurrent.atomic.AtomicInteger
 
   val decider: Supervision.Decider = {
     case _: ArithmeticException ⇒ Supervision.Resume
@@ -31,18 +32,22 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
     Http().cachedHostConnectionPool[Int](u.authority.host.address, u.authority.port, poolSettings)
   }.toVector
 
-  var idx = 0
-  val maxTries = servers.size + 1 // Run once through the server pool before giving up
+  val idx: AtomicInteger = new AtomicInteger()
+
+  val maxTries = servers.size // Run once through the server pool before giving up
+
+  def getIdx = idx.get() % pool.size
 
   def next = {
-    val next = pool(idx)
-    idx += 1
-    if (idx == pool.length) idx = 0
+    val next = pool(idx.getAndIncrement() % pool.size)
+    if (idx.get() == pool.length) idx.set(0)
     next
   }
 
   /**
-    * Execute a single request using the connection pool.
+    * Execute a single request using the connection pool. Note that there is no guarantee that the
+    * servers will be called in exact sequence or that the error message will refer to the
+    * actual server that failed as the {{ next }} function is not thread safe.
     *
     * @param req An HttpRequest
     * @return The response
@@ -50,18 +55,23 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
   def exec(req: HttpRequest): Future[HttpResponse] = {
 
     def execHelper(request: HttpRequest, tries: Int): Future[HttpResponse] = {
-      Source.single(req → idx)
+      Source.single(req → getIdx)
         .via(next)
         .withAttributes(ActorAttributes.supervisionStrategy(decider))
         .runWith(Sink.head)
         .flatMap {
-          case (Success(r: HttpResponse), _) ⇒ Future.successful(r)
+          case (Success(r: HttpResponse), _) ⇒
+            system.log.info(s"Request to ${req.uri} succeeded on  ${servers(getIdx)}")
+            Future.successful(r)
           case (Failure(f), p) if tries < maxTries ⇒
             system.log.warning(s"Request to ${request.uri} failed on ${servers(p)}: Failure was ${f.getMessage}")
             execHelper(req, tries + 1)
-          case (Failure(f), _) if tries >= maxTries ⇒
+          case (Failure(f), _) if tries == maxTries ⇒
             system.log.error(s"Request to ${request.uri} failed (no servers available)")
             Future.failed(NoServersResponded)
+          case (Failure(f), p) ⇒
+            system.log.warning(s"Request to ${request.uri} failed on ${servers(p)}: Failure was ${f.getMessage}")
+            Future.failed(f)
         }
     }
 
