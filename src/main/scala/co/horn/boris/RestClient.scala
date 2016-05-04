@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.{ActorAttributes, ActorMaterializer, Supervision}
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 
 import scala.concurrent.{Future, TimeoutException}
 import scala.concurrent.duration._
@@ -33,9 +33,13 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
       Supervision.Stop
   }
 
+  // The flow needed to
   private val pool = servers.map { u ⇒
-    Http().cachedHostConnectionPool[Int](u.authority.host.address, u.authority.port, poolSettings)
-  }.toVector
+    Flow[(HttpRequest, Int)]
+      .via(Http().cachedHostConnectionPool[Int](u.authority.host.address, u.authority.port, poolSettings))
+      .withAttributes(ActorAttributes.supervisionStrategy(decider))
+      .completionTimeout(1 seconds) // TimeoutExceptions are not caught properly. Need to catch this
+  }
 
   val idx: AtomicInteger = new AtomicInteger()
 
@@ -44,9 +48,9 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
   def getIdx = idx.get() % pool.size
 
   def next = {
-    val next = pool(idx.getAndIncrement() % pool.size)
+    val n = pool(idx.getAndIncrement() % pool.size)
     if (idx.get() == pool.length) idx.set(0)
-    next
+    n
   }
 
   /**
@@ -62,8 +66,6 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
     def execHelper(request: HttpRequest, tries: Int): Future[HttpResponse] = {
       Source.single(request → getIdx) // Materialise this in a val so we don't have to create it each time
         .via(next)
-        .completionTimeout(1 seconds) // TimeoutExceptions are not caught properly. Need to catch this
-        .withAttributes(ActorAttributes.supervisionStrategy(decider))
         .runWith(Sink.head)
         .flatMap {
           case (Success(r: HttpResponse), _) ⇒
