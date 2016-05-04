@@ -13,21 +13,28 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.http.scaladsl.client.RequestBuilding._
 import akka.stream.ActorMaterializer
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.time.{Seconds, Span}
+import org.scalatest.time.{Milliseconds, Seconds, Span}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
+
+import scala.concurrent.Future
 
 class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers {
 
   implicit val system = ActorSystem("Test")
   implicit val materializer = ActorMaterializer()
-  implicit val patience = PatienceConfig(timeout = Span(10, Seconds))
+  implicit val patience = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
 
   // Very simple routing that just returns the current server instance
-  def route(instance: String) = get {
+  def route(instance: Int) = get {
     path("bumble") {
-      complete(StatusCodes.OK, instance)
+      complete(StatusCodes.OK, instance.toString)
+    } ~
+    path("slow") {
+      println(instance)
+      Thread.sleep(instance * 1000)
+      complete(StatusCodes.OK, instance.toString)
     }
   }
   var servers = Seq[ServerBinding]()
@@ -35,11 +42,11 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
   val uri = instances.map(i ⇒ Uri(s"http://localhost:${10100 + i}"))
 
   override def beforeEach {
-    servers = instances.map(i ⇒ Http().bindAndHandle(route(i.toString), "localhost", 10100 + i).futureValue)
+    servers = instances.map(i ⇒ Http().bindAndHandle(route(i), "localhost", 10100 + i).futureValue)
   }
 
   override def afterEach {
-    servers.foreach(_.unbind.futureValue)
+    Future.sequence(servers.map(_.unbind)).futureValue
   }
 
   describe("The round robin scheduler") {
@@ -64,6 +71,14 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     it("fails if no servers are able to serve the request") {
       val pool = RestClient(Seq(Uri("http://localhost:10123"), Uri("http://localhost:10124"), Uri("http://localhost:10125")), ConnectionPoolSettings(system))
       pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).failed.futureValue shouldBe NoServersResponded
+    }
+
+    it("handles servers that time out") {
+      val pool = RestClient(uri, ConnectionPoolSettings(system))
+      val ret = (0 until 20).map { i ⇒
+        pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
+      }
+
     }
   }
 

@@ -2,12 +2,13 @@ package co.horn.boris
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{Uri, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.settings.ConnectionPoolSettings
-import akka.stream.{ActorAttributes, Supervision, ActorMaterializer}
+import akka.stream.{ActorAttributes, ActorMaterializer, Supervision}
 import akka.stream.scaladsl.{Sink, Source}
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, TimeoutException}
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**
@@ -23,11 +24,15 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
   import java.util.concurrent.atomic.AtomicInteger
 
   val decider: Supervision.Decider = {
-    case _: ArithmeticException ⇒ Supervision.Resume
+    case _: ArithmeticException ⇒ Supervision.Resume // Arb error.... We need to check for other errors
+    case t: TimeoutException ⇒
+      println(s"********** Timeout!!! ${t.getMessage}")
+      Supervision.Stop
     case s ⇒
-      println(s"${s.getMessage}")
+      println(s"************************************** ${s.getMessage}")
       Supervision.Stop
   }
+
   private val pool = servers.map { u ⇒
     Http().cachedHostConnectionPool[Int](u.authority.host.address, u.authority.port, poolSettings)
   }.toVector
@@ -55,8 +60,9 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
   def exec(req: HttpRequest): Future[HttpResponse] = {
 
     def execHelper(request: HttpRequest, tries: Int): Future[HttpResponse] = {
-      Source.single(req → getIdx)
+      Source.single(request → getIdx) // Materialise this in a val so we don't have to create it each time
         .via(next)
+        .completionTimeout(1 seconds) // TimeoutExceptions are not caught properly. Need to catch this
         .withAttributes(ActorAttributes.supervisionStrategy(decider))
         .runWith(Sink.head)
         .flatMap {
