@@ -5,9 +5,8 @@ scalaVersion := "2.11.8"
 fork in Test := true
 
 libraryDependencies ++= {
-  val akkaV        = "2.4.4"
+  val akkaV        = "2.4.8"
   val scalaTestV   = "2.2.6"
-  val slickV       = "3.1.1"
   val sl4jV        = "1.6.4"
   Seq(
     "com.typesafe.akka"   %% "akka-actor"                         % akkaV,

@@ -24,7 +24,6 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
   import java.util.concurrent.atomic.AtomicInteger
 
   val decider: Supervision.Decider = {
-    case _: ArithmeticException ⇒ Supervision.Resume // Arb error.... We need to check for other errors
     case t: TimeoutException ⇒
       println(s"********** Timeout!!! ${t.getMessage}")
       Supervision.Stop
@@ -37,8 +36,8 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
   private val pool = servers.map { u ⇒
     Flow[(HttpRequest, Int)]
       .via(Http().cachedHostConnectionPool[Int](u.authority.host.address, u.authority.port, poolSettings))
-      .withAttributes(ActorAttributes.supervisionStrategy(decider))
       .completionTimeout(1 seconds) // TimeoutExceptions are not caught properly. Need to catch this
+      .withAttributes(ActorAttributes.supervisionStrategy(decider))
   }
 
   val idx: AtomicInteger = new AtomicInteger()
@@ -82,7 +81,6 @@ case class RestClient(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(i
             Future.failed(f)
         }
     }
-
     execHelper(req, 0)
   }
 }
