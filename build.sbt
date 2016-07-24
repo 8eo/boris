@@ -1,8 +1,17 @@
 
 name := "boris"
-version := "0.0.0"
+version := "0.0.1"
 scalaVersion := "2.11.8"
 fork in Test := true
+scalafmtConfig := Some(file(".scalafmt"))
+scalacOptions ++= Seq(
+  "-unchecked",
+  "-deprecation",
+  "-Ywarn-dead-code",
+  "-encoding", "UTF-8",
+  "-target:jvm-1.8",
+  "-feature",
+  "-language:postfixOps")
 
 libraryDependencies ++= {
   val akkaV        = "2.4.8"

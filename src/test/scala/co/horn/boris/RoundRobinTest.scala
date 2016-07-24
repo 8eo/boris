@@ -32,8 +32,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       complete(StatusCodes.OK, instance.toString)
     } ~
     path("slow") {
-      println(instance)
-      Thread.sleep(instance * 1000)
+      if (instance == 1) Thread.sleep(1000)
       complete(StatusCodes.OK, instance.toString)
     }
   }
@@ -79,6 +78,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
+      ret.toSet should contain only("0", "2", "3", "4") // Server "1" is slow
     }
   }
 

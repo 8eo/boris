@@ -1,6 +1,9 @@
-# boris #
+# Boris #
 
-Welcome to boris!
+Boris the Russian is can not be killed! The goal is to provide a robust, reactive and 
+failsafe ReST client for accessing multiple redundant servers providing an identical
+service. If a call to one of them fails, Boris will simply attempt the request on
+another server and fail only if all server options have been exhausted.
 
 ## Contribution policy ##
 
