@@ -16,6 +16,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Milliseconds, Seconds, Span}
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
 import scala.concurrent.Future
@@ -74,7 +75,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     }
 
     it("handles servers that time out") {
-      val pool = RestClient(uri, ConnectionPoolSettings(system))
+      val pool = RestClient(uri, ConnectionPoolSettings(system), 0.5 seconds)
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
