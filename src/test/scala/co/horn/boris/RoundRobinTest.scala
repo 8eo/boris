@@ -6,20 +6,19 @@ package co.horn.boris
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.client.RequestBuilding._
 import akka.http.scaladsl.model.{StatusCodes, Uri}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.http.scaladsl.client.RequestBuilding._
 import akka.stream.ActorMaterializer
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Milliseconds, Seconds, Span}
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
 
@@ -42,7 +41,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
   val uri = instances.map(i ⇒ Uri(s"http://localhost:${10100 + i}"))
 
   override def beforeEach {
-    Http().shutdownAllConnectionPools() // Terminate all pools so the servers can actually shut down
+    Http(system).shutdownAllConnectionPools() // Terminate all pools so the servers can actually shut down
     servers = instances.map(i ⇒ Http().bindAndHandle(route(i), "localhost", 10100 + i).futureValue)
   }
 
@@ -82,5 +81,4 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       ret.toSet should contain only("0", "2", "3", "4") // Server "1" is slow
     }
   }
-
 }
