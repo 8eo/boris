@@ -7,7 +7,7 @@ import akka.stream.QueueOfferResult
 
 trait BorisError extends Throwable
 
-case object NoServersResponded extends BorisError
+case class NoServersResponded(cause: Throwable) extends BorisError
 
 /**
   * Adding request to pool connection queue fails

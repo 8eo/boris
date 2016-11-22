@@ -1,4 +1,4 @@
-
+organization := "co.horn"
 name := "boris"
 version := "0.0.2"
 scalaVersion := "2.11.8"
@@ -14,7 +14,7 @@ scalacOptions ++= Seq(
   "-language:postfixOps")
 
 libraryDependencies ++= {
-  val akkaV        = "2.4.12"
+  val akkaV        = "2.4.13"
   val akkaHttpV    = "2.4.11"
   val scalaTestV   = "2.2.6"
   Seq(
@@ -23,7 +23,7 @@ libraryDependencies ++= {
     "com.typesafe.akka"   %% "akka-http-core"                     % akkaHttpV,
     "com.typesafe.akka"   %% "akka-http-experimental"             % akkaHttpV,
     "com.typesafe.akka"   %% "akka-http-spray-json-experimental"  % akkaHttpV,
-    "com.typesafe.akka"   %% "akka-http-testkit"                  % akkaHttpV,
+    "com.typesafe.akka"   %% "akka-http-testkit"                  % akkaHttpV     % "test",
     "org.scalatest"       %% "scalatest"                          % scalaTestV    % "test"
   )
 }
