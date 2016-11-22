@@ -6,20 +6,20 @@ package co.horn.boris
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.client.RequestBuilding._
 import akka.http.scaladsl.model.{StatusCodes, Uri}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.http.scaladsl.client.RequestBuilding._
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, BufferOverflowException, StreamTcpException}
+import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Milliseconds, Seconds, Span}
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
 
@@ -32,17 +32,22 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     path("bumble") {
       complete(StatusCodes.OK, instance.toString)
     } ~
-    path("slow") {
-      if (instance == 1) Thread.sleep(1000)
-      complete(StatusCodes.OK, instance.toString)
-    }
+      path("slow") {
+        if (instance == 1) Thread.sleep(1000)
+        complete(StatusCodes.OK, instance.toString)
+      } ~
+      path("slow" / "abit") {
+        Thread.sleep(50)
+        complete(StatusCodes.OK, instance.toString)
+      }
   }
+
   var servers = Seq[ServerBinding]()
   val instances = 0 until 5
   val uri = instances.map(i ⇒ Uri(s"http://localhost:${10100 + i}"))
 
   override def beforeEach {
-    Http().shutdownAllConnectionPools() // Terminate all pools so the servers can actually shut down
+    Http(system).shutdownAllConnectionPools() // Terminate all pools so the servers can actually shut down
     servers = instances.map(i ⇒ Http().bindAndHandle(route(i), "localhost", 10100 + i).futureValue)
   }
 
@@ -66,21 +71,62 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
-      ret.toSet should contain only("0", "2", "3", "4")
+      ret.toSet should contain only ("0", "2", "3", "4")
     }
 
     it("fails if no servers are able to serve the request") {
-      val pool = RestClient(Seq(Uri("http://localhost:10123"), Uri("http://localhost:10124"), Uri("http://localhost:10125")), ConnectionPoolSettings(system))
-      pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).failed.futureValue shouldBe NoServersResponded
+      val pool =
+        RestClient(Seq(Uri("http://localhost:10123"), Uri("http://localhost:10124"), Uri("http://localhost:10125")),
+                   ConnectionPoolSettings(system))
+      pool
+        .exec(Get("/bumble"))
+        .flatMap(f ⇒ Unmarshal(f.entity).to[String])
+        .failed
+        .futureValue
+        .asInstanceOf[NoServersResponded]
+        .cause shouldBe a[StreamTcpException]
     }
 
     it("handles servers that time out") {
-      val pool = RestClient(uri, ConnectionPoolSettings(system), 0.5 seconds)
+      val config = ConfigFactory.parseString("""
+          |horn.boris{
+          |  request-timeout = 0.5s
+          |  materialize-timeout = 0.4s
+          |}
+        """.stripMargin).withFallback(system.settings.config)
+      val pool = RestClient(uri, ConnectionPoolSettings(system), config)
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
-      ret.toSet should contain only("0", "2", "3", "4") // Server "1" is slow
+      ret.toSet should contain only ("0", "2", "3", "4") // Server "1" is slow
     }
   }
 
+  describe("The RestClient") {
+
+    it("will fails when buffer size will be too small") {
+      val config = ConfigFactory.parseString("horn.boris.bufferSize = 10").withFallback(system.settings.config)
+      val pool = RestClient(uri, ConnectionPoolSettings(system), config)
+      val ret = (0 until 512).map { i ⇒
+        pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
+      }
+      Future.sequence(ret).failed.futureValue.asInstanceOf[NoServersResponded].cause shouldBe a[EnqueueRequestFails]
+    }
+
+    it("will work fine if buffer size is proper") {
+      val pool = RestClient(uri, ConnectionPoolSettings(system))
+      val ret = (0 until 512).map { i ⇒
+        pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
+      }
+      Future.sequence(ret).futureValue
+    }
+
+    it("beats the client without queue") {
+      val pool = RestClientWithoutQueue(uri.head, ConnectionPoolSettings(system))
+      val ret = (0 until 100).map { i ⇒
+        pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
+      }
+      Future.sequence(ret).failed.futureValue shouldBe a[BufferOverflowException]
+    }
+  }
 }
