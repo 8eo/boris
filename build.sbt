@@ -16,7 +16,6 @@ scalacOptions ++= Seq(
   "-language:postfixOps")
 
 libraryDependencies ++= {
-  val akkaV        = "2.4.14"
   val akkaHttpV    = "10.0.0"
   val scalaTestV   = "3.0.1"
   Seq(
