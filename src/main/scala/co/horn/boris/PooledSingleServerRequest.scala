@@ -27,7 +27,6 @@ import scala.concurrent.{Future, Promise}
   * @param system                   An actor system in which to execute the requests
   * @param materializer             A flow materializer
   */
-@throws(classOf[IllegalArgumentException])
 private[boris] class PooledSingleServerRequest(server: Uri,
                                                poolSettings: ConnectionPoolSettings,
                                                requestTimeout: FiniteDuration,
@@ -54,7 +53,7 @@ private[boris] class PooledSingleServerRequest(server: Uri,
 
   private val dropQueue = queue(pool, drop, bufferSize, overflowStrategy, "")
 
-  private val strictQueue = queue(pool, strict(requestTimeout), bufferSize, overflowStrategy, "")
+  private val strictQueue = queue(pool, strict(strictMaterializeTimeout), bufferSize, overflowStrategy, "")
 
   private val notConsumedQueue = queue(pool, notConsumed, bufferSize, overflowStrategy, "")
 
@@ -88,11 +87,15 @@ private[boris] class PooledSingleServerRequest(server: Uri,
   private def execHelper(
       request: HttpRequest,
       queue: SourceQueueWithComplete[(HttpRequest, Promise[HttpResponse])]): Future[HttpResponse] = {
+    import co.horn.boris.utils.FutureUtils.FutureWithTimeout
     val promise = Promise[HttpResponse]
-    queue.offer(request -> promise).flatMap {
-      case Enqueued ⇒ promise.future
-      case other ⇒ Future.failed(EnqueueRequestFails(other))
-    }
+    queue
+      .offer(request -> promise)
+      .flatMap {
+        case Enqueued ⇒ promise.future
+        case other ⇒ Future.failed(EnqueueRequestFails(other))
+      }
+      .withTimeout(requestTimeout)
   }
 
   /**
