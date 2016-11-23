@@ -28,6 +28,8 @@ import scala.concurrent.{Future, Promise}
   * @param system                   An actor system in which to execute the requests
   * @param materializer             A flow materializer
   */
+
+// TODO: Support https connections
 @throws(classOf[IllegalArgumentException])
 class PooledMultiServerRequest(servers: Seq[Uri],
                                poolSettings: ConnectionPoolSettings,

@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import scala.concurrent.Future
 
 /**
-  * Interface into the ReST clients offerd by Boris
+  * Interface into the ReST clients offered by Boris
   */
 trait RestRequests {
 

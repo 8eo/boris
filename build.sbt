@@ -1,9 +1,10 @@
-organization := "co.horn"
 name := "boris"
+organization := "co.horn"
 version := "0.0.2"
 scalaVersion := "2.11.8"
 fork in Test := true
-scalafmtConfig := Some(file(".scalafmt"))
+scalafmtConfig := Some(file(".scalafmt.conf"))
+
 scalacOptions ++= Seq(
   "-unchecked",
   "-deprecation",

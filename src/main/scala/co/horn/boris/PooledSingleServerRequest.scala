@@ -2,9 +2,10 @@
  * Copyright © ${year} 8eo Inc.
  */
 package co.horn.boris
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.scaladsl.{Keep, Sink, Source}
@@ -17,20 +18,16 @@ import scala.util.{Failure, Success, Try}
 /**
   * Rest client dispatcher using an Akka http pooled connection to make the requests
   *
-  * @param address      The target server's address
-  * @param port         The target server's address
+  * @param server       The target server's address
   * @param secure       If the connection is using https
   * @param poolSettings Settings for this particular connection pool
   * @param buffer       The size of queue that will handle back pressure on pull connection ( 0 means infinite)
   * @param system       An actor system in which to execute the requests
   * @param materializer A flow materialiser
   */
-case class PooledSingleServerRequest(
-    address: String,
-    port: Int,
-    secure: Boolean,
-    poolSettings: ConnectionPoolSettings,
-    buffer: Int)(implicit val system: ActorSystem, implicit val materializer: ActorMaterializer)
+case class PooledSingleServerRequest(server: Uri, secure: Boolean, poolSettings: ConnectionPoolSettings, buffer: Int = 10)(
+    implicit val system: ActorSystem,
+    implicit val materializer: ActorMaterializer)
     extends RestRequests
     with BatchRequests {
 
@@ -38,9 +35,13 @@ case class PooledSingleServerRequest(
 
   private val pool =
     if (secure)
-      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](address, port, settings = poolSettings)
+      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](server.authority.host.address,
+                                                                  server.authority.port,
+                                                                  settings = poolSettings)
     else
-      Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port, poolSettings)
+      Http().cachedHostConnectionPool[Promise[HttpResponse]](server.authority.host.address,
+                                                             server.authority.port,
+                                                             poolSettings)
 
   /**
     * Pool connection queue, that's the way of handling back pressure in pools
@@ -50,7 +51,7 @@ case class PooledSingleServerRequest(
   private def _queue(f: PartialFunction[(Try[HttpResponse], Promise[HttpResponse]), Unit]) =
     Source
       .queue[(HttpRequest, Promise[HttpResponse])](buffer, OverflowStrategy.dropNew)
-      .named(s"Connection to: $address:$port")
+      .named(s"Connection to: $Uri")
       .via(pool)
       .toMat(Sink.foreach(f))(Keep.left)
       .run
@@ -72,7 +73,7 @@ case class PooledSingleServerRequest(
     */
   private val _strict: PartialFunction[(Try[HttpResponse], Promise[HttpResponse]), Unit] = {
     case ((Success(resp), p)) =>
-      resp.toStrict(10 seconds).map(p.success)
+      resp.toStrict(10 seconds).map(p.success)  // Todo: Parameterize or configurate this
     case ((Failure(e), p)) => p.failure(e)
   }
 
