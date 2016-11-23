@@ -19,6 +19,7 @@ import scala.concurrent.{Future, Promise}
   *
   * @param server                   The target server's uri
   * @param poolSettings             Settings for this particular connection pool
+  * @param name                     The name for http flow
   * @param requestTimeout           Maximum duration before a request is considered timed out.
   * @param strictMaterializeTimeout Maximum duration for materialize the response entity when using strict method.
   * @param bufferSize               Maximum size for backpressure queue. If all connection ale in use, the request will wait there to be executed.
@@ -29,6 +30,7 @@ import scala.concurrent.{Future, Promise}
   */
 private[boris] class PooledSingleServerRequest(server: Uri,
                                                poolSettings: ConnectionPoolSettings,
+                                               name: String,
                                                requestTimeout: FiniteDuration,
                                                strictMaterializeTimeout: FiniteDuration,
                                                bufferSize: Int,
@@ -51,11 +53,11 @@ private[boris] class PooledSingleServerRequest(server: Uri,
                                                              poolSettings)
     }
 
-  private val dropQueue = queue(pool, drop, bufferSize, overflowStrategy, "")
+  private val dropQueue = queue(pool, drop, bufferSize, overflowStrategy, name)
 
-  private val strictQueue = queue(pool, strict(strictMaterializeTimeout), bufferSize, overflowStrategy, "")
+  private val strictQueue = queue(pool, strict(strictMaterializeTimeout), bufferSize, overflowStrategy, name)
 
-  private val notConsumedQueue = queue(pool, notConsumed, bufferSize, overflowStrategy, "")
+  private val notConsumedQueue = queue(pool, notConsumed, bufferSize, overflowStrategy, name)
 
   /**
     * Execute a single request using the connection pool. Callers ABSOLUTELY HAVE TO
@@ -136,6 +138,7 @@ object PooledSingleServerRequest {
       materializer: ActorMaterializer): PooledSingleServerRequest = {
     new PooledSingleServerRequest(uri,
                                   poolSettings,
+                                  settings.name,
                                   settings.requestTimeout,
                                   settings.strictMaterializeTimeout,
                                   settings.bufferSize,

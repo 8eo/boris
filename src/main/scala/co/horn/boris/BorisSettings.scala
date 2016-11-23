@@ -25,7 +25,8 @@ object QueueOverflowStrategy {
 }
 
 @throws(classOf[IllegalArgumentException])
-case class BorisSettings(requestTimeout: FiniteDuration,
+case class BorisSettings(name: String,
+                         requestTimeout: FiniteDuration,
                          strictMaterializeTimeout: FiniteDuration,
                          bufferSize: Int,
                          overflowStrategy: OverflowStrategy) {
@@ -33,8 +34,10 @@ case class BorisSettings(requestTimeout: FiniteDuration,
   require(requestTimeout > 0.seconds, "Request timeout must be larger than 0(zero)")
   require(strictMaterializeTimeout > 0.seconds, "Timeout for entity materialization must be larger than 0(zero)")
   require(requestTimeout > strictMaterializeTimeout,
-    "Request timeout must be larger than timeout for entity materialization")
+          "Request timeout must be larger than timeout for entity materialization")
   require(bufferSize > 0, "Queue buffer size must be larger than 0(zero)")
+
+  def withName(name: String): BorisSettings = this.copy(name = name)
 
   def withRequestTimeout(timeout: FiniteDuration): BorisSettings = this.copy(requestTimeout = timeout)
 
@@ -48,11 +51,12 @@ case class BorisSettings(requestTimeout: FiniteDuration,
 
 object BorisSettings {
   def apply(config: Config): BorisSettings = {
+    val name = config.getString("name")
     val requestTimeout = config.getDuration("request-timeout", TimeUnit.MILLISECONDS).millis
     val strictMaterializeTimeout = config.getDuration("materialize-timeout", TimeUnit.MILLISECONDS).millis
     val bufferSize = config.getInt("bufferSize")
     val overflowStrategy = QueueOverflowStrategy(config.getString("overflowStrategy"))
-    BorisSettings(requestTimeout, strictMaterializeTimeout, bufferSize, overflowStrategy)
+    BorisSettings(name, requestTimeout, strictMaterializeTimeout, bufferSize, overflowStrategy)
   }
 
   def apply(configOverrides: String): BorisSettings = apply(ConfigFactory.parseString(configOverrides))

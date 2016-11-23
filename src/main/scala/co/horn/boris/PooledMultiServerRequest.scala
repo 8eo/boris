@@ -18,6 +18,7 @@ import scala.concurrent.{Future, Promise}
   *
   * @param servers                  A list of URIs pointing to a set of functionally identical servers
   * @param poolSettings             Settings for this particular connection pool
+  * @param name                     The name for http flow
   * @param requestTimeout           Maximum duration before a request is considered timed out.
   * @param strictMaterializeTimeout Maximum duration for materialize the response entity when using strict method.
   * @param bufferSize               Maximum size for backpressure queue. If all connection ale in use, the request will wait there to be executed.
@@ -29,6 +30,7 @@ import scala.concurrent.{Future, Promise}
 @throws(classOf[IllegalArgumentException])
 private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
                                               poolSettings: ConnectionPoolSettings,
+                                              name: String,
                                               requestTimeout: FiniteDuration,
                                               strictMaterializeTimeout: FiniteDuration,
                                               bufferSize: Int,
@@ -52,9 +54,9 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
     case u ⇒
       Http().cachedHostConnectionPool[Promise[HttpResponse]](u.authority.host.address, u.authority.port, poolSettings)
   }.map { pool ⇒
-    Map(QueueTypes.drop → queue(pool, drop, bufferSize, overflowStrategy, ""),
-        QueueTypes.strict → queue(pool, strict(strictMaterializeTimeout), bufferSize, overflowStrategy, ""),
-        QueueTypes.notConsumed → queue(pool, notConsumed, bufferSize, overflowStrategy, ""))
+    Map(QueueTypes.drop → queue(pool, drop, bufferSize, overflowStrategy, name),
+        QueueTypes.strict → queue(pool, strict(strictMaterializeTimeout), bufferSize, overflowStrategy, name),
+        QueueTypes.notConsumed → queue(pool, notConsumed, bufferSize, overflowStrategy, name))
   }
 
   private val poolIndex: AtomicInteger = new AtomicInteger()
@@ -121,6 +123,7 @@ object PooledMultiServerRequest {
       materializer: ActorMaterializer): PooledMultiServerRequest = {
     new PooledMultiServerRequest(servers,
                                  poolSettings,
+                                 settings.name,
                                  settings.requestTimeout,
                                  settings.strictMaterializeTimeout,
                                  settings.bufferSize,
