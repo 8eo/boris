@@ -58,7 +58,7 @@ trait BatchRequests {
     * @param requests A list of requests that should be simultaneously issued to the pool
     * @return The responses in the same order as they were submitted
     */
-  def execFlatten(requests: Iterable[HttpRequest]): Future[Iterable[HttpResponse]]
+  def execFlatten(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Future[Iterable[HttpResponse]]
 
   /**
     * Take some sequence of requests and pipeline them through the connection pool.
@@ -69,5 +69,6 @@ trait BatchRequests {
     * @param requests A list of requests that should be simultaneously issued to the pool
     * @return The Future responses in the same order as they were submitted
     */
-  def exec(requests: Iterable[HttpRequest]): Future[Iterable[Future[HttpResponse]]]
+
+  def exec(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Iterable[Future[HttpResponse]]
 }

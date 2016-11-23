@@ -2,91 +2,60 @@
  * Copyright © ${year} 8eo Inc.
  */
 package co.horn.boris
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.QueueOfferResult.Enqueued
-import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 
-import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.{Future, Promise}
 
 /**
   * Rest client dispatcher using an Akka http pooled connection to make the requests
   *
-  * @param address      The target server's address
-  * @param port         The target server's address
-  * @param secure       If the connection is using https
-  * @param poolSettings Settings for this particular connection pool
-  * @param buffer       The size of queue that will handle back pressure on pull connection ( 0 means infinite)
-  * @param system       An actor system in which to execute the requests
-  * @param materializer A flow materialiser
+  * @param server                   The target server's uri
+  * @param poolSettings             Settings for this particular connection pool
+  * @param requestTimeout           Maximum duration before a request is considered timed out.
+  * @param strictMaterializeTimeout Maximum duration for materialize the response entity when using strict method.
+  * @param bufferSize               Maximum size for backpressure queue. If all connection ale in use, the request will wait there to be executed.
+  *                                 should be bigger than akka.http.client.host-connection-pool.max-open-requests(default 32)
+  * @param overflowStrategy         Queue backpressure strategy, What to do when the queue is full(default drop new request)
+  * @param system                   An actor system in which to execute the requests
+  * @param materializer             A flow materializer
   */
-case class PooledSingleServerRequest(
-    address: String,
-    port: Int,
-    secure: Boolean,
-    poolSettings: ConnectionPoolSettings,
-    buffer: Int)(implicit val system: ActorSystem, implicit val materializer: ActorMaterializer)
-    extends RestRequests
+case class PooledSingleServerRequest(server: Uri,
+                                     poolSettings: ConnectionPoolSettings,
+                                     requestTimeout: FiniteDuration,
+                                     strictMaterializeTimeout: FiniteDuration,
+                                     bufferSize: Int,
+                                     overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew)(
+                                      implicit val system: ActorSystem,
+                                      implicit val materializer: ActorMaterializer)
+  extends RestRequests
     with BatchRequests {
 
   import system.dispatcher
 
   private val pool =
-    if (secure)
-      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](address, port, settings = poolSettings)
-    else
-      Http().cachedHostConnectionPool[Promise[HttpResponse]](address, port, poolSettings)
+    if (server.scheme == "https") {
+      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](server.authority.host.address,
+        server.authority.port,
+        settings = poolSettings)
+    } else {
+      Http().cachedHostConnectionPool[Promise[HttpResponse]](server.authority.host.address,
+        server.authority.port,
+        poolSettings)
+    }
 
-  /**
-    * Pool connection queue, that's the way of handling back pressure in pools
-    *
-    * @param f Function that describes how to handle the response entity
-    */
-  private def _queue(f: PartialFunction[(Try[HttpResponse], Promise[HttpResponse]), Unit]) =
-    Source
-      .queue[(HttpRequest, Promise[HttpResponse])](buffer, OverflowStrategy.dropNew)
-      .named(s"Connection to: $address:$port")
-      .via(pool)
-      .toMat(Sink.foreach(f))(Keep.left)
-      .run
+  private val dropQueue = queue(pool, drop, bufferSize, overflowStrategy, "")
 
-  /**
-    * Drop entity
-    */
-  private val _drop: PartialFunction[(Try[HttpResponse], Promise[HttpResponse]), Unit] = {
-    case ((Success(resp), p)) =>
-      resp.discardEntityBytes()
-      p.success(resp)
-    case ((Failure(e), p)) => p.failure(e)
-  }
+  private val strictQueue = queue(pool, strict, bufferSize, overflowStrategy, "")
 
-  private val dropQueue = _queue(_drop)
-
-  /**
-    * Convert entity to strict
-    */
-  private val _strict: PartialFunction[(Try[HttpResponse], Promise[HttpResponse]), Unit] = {
-    case ((Success(resp), p)) =>
-      resp.toStrict(10 seconds).map(p.success)
-    case ((Failure(e), p)) => p.failure(e)
-  }
-
-  private val strictQueue = _queue(_strict)
-
-  /**
-    * The entity is not consumed, need to be handled manually
-    */
-  private val _notConsumed: PartialFunction[(Try[HttpResponse], Promise[HttpResponse]), Unit] = {
-    case ((Success(resp), p)) => p.success(resp)
-    case ((Failure(e), p)) => p.failure(e)
-  }
-
-  private val notConsumedQueue = _queue(_notConsumed)
+  private val notConsumedQueue = queue(pool, notConsumed, bufferSize, overflowStrategy, "")
 
   /**
     * Execute a single request using the connection pool. Callers ABSOLUTELY HAVE TO
@@ -95,13 +64,7 @@ case class PooledSingleServerRequest(
     * @param req An HttpRequest
     * @return The response
     */
-  def exec(req: HttpRequest): Future[HttpResponse] = {
-    val promise = Promise[HttpResponse]
-    notConsumedQueue.offer(req -> promise).flatMap {
-      case Enqueued ⇒ promise.future
-      case other ⇒ Future.failed(EnqueueRequestFails(other))
-    }
-  }
+  def exec(req: HttpRequest): Future[HttpResponse] = execHelper(req, notConsumedQueue)
 
   /**
     * Execute a single request using the connection pool but explicitly drop the response
@@ -110,13 +73,7 @@ case class PooledSingleServerRequest(
     * @param req An HttpRequest
     * @return The response
     */
-  def execDrop(req: HttpRequest): Future[HttpResponse] = {
-    val promise = Promise[HttpResponse]
-    dropQueue.offer(req -> promise).flatMap {
-      case Enqueued ⇒ promise.future
-      case other ⇒ Future.failed(EnqueueRequestFails(other))
-    }
-  }
+  def execDrop(req: HttpRequest): Future[HttpResponse] = execHelper(req, strictQueue)
 
   /**
     * Execute a single request using the connection pool strictly consuming
@@ -125,9 +82,13 @@ case class PooledSingleServerRequest(
     * @param req An HttpRequest
     * @return The response
     */
-  def execStrict(req: HttpRequest): Future[HttpResponse] = {
+  def execStrict(req: HttpRequest): Future[HttpResponse] = execHelper(req, strictQueue)
+
+  private def execHelper(
+                          request: HttpRequest,
+                          queue: SourceQueueWithComplete[(HttpRequest, Promise[HttpResponse])]): Future[HttpResponse] = {
     val promise = Promise[HttpResponse]
-    strictQueue.offer(req -> promise).flatMap {
+    queue.offer(request -> promise).flatMap {
       case Enqueued ⇒ promise.future
       case other ⇒ Future.failed(EnqueueRequestFails(other))
     }
@@ -142,8 +103,8 @@ case class PooledSingleServerRequest(
     * @param requests A list of requests that should be simultaneously issued to the pool
     * @return The responses in the same order as they were submitted
     */
-  def execFlatten(requests: Iterable[HttpRequest]): Future[Iterable[HttpResponse]] = {
-    exec(requests).flatMap(Future.sequence(_))
+  def execFlatten(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Future[Iterable[HttpResponse]] = {
+    Future.sequence(exec(requests, queueTypes))
   }
 
   /**
@@ -155,8 +116,12 @@ case class PooledSingleServerRequest(
     * @param requests A list of requests that should be simultaneously issued to the pool
     * @return The Future responses in the same order as they were submitted
     */
-  def exec(requests: Iterable[HttpRequest]): Future[Iterable[Future[HttpResponse]]] = {
-    val _req = requests.map(r ⇒ r → Promise[HttpResponse]).toMap
-    Source(_req).via(pool).runWith(Sink.foreach(_notConsumed)).map(_ ⇒ _req.values.map(_.future))
+  def exec(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Iterable[Future[HttpResponse]] = {
+    val f = queueTypes match {
+      case QueueTypes.drop ⇒ dropQueue
+      case QueueTypes.strict ⇒ strictQueue
+      case QueueTypes.notConsumed ⇒ notConsumedQueue
+    }
+    requests.map(r ⇒ execHelper(r, f))
   }
 }

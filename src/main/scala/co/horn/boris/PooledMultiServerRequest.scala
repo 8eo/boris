@@ -18,7 +18,7 @@ import scala.concurrent.{Future, Promise}
 /**
   * Rest client dispatcher using an Akka http pooled connection to make the requests
   *
-  * @param servers                  A list of URIs pointing to a set Òof functionally identical servers
+  * @param servers                  A list of URIs pointing to a set of functionally identical servers
   * @param poolSettings             Settings for this particular connection pool
   * @param requestTimeout           Maximum duration before a request is considered timed out.
   * @param strictMaterializeTimeout Maximum duration for materialize the response entity when using strict method.
