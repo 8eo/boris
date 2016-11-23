@@ -15,11 +15,10 @@ import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Milliseconds, Seconds, Span}
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class PooledRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
+class SingleRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
 
   implicit val system = ActorSystem("Test")
   implicit val materializer = ActorMaterializer()
@@ -52,10 +51,10 @@ class PooledRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
     server.unbind.futureValue
   }
 
-  describe("Pooled single server requests") {
+  describe("Single server requests") {
 
     it("exec calls to the specified URI") {
-      val pool = PooledSingleServerRequest(uri, ConnectionPoolSettings(system))
+      val pool = SingleServerRequest(uri)
       val ret = (0 until 20).map { _ ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
@@ -63,7 +62,7 @@ class PooledRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
     }
 
     it("execStrict calls to the specified URI") {
-      val pool = PooledSingleServerRequest(uri, ConnectionPoolSettings(system))
+      val pool = SingleServerRequest(uri)
       val ret = (0 until 20).map { _ ⇒
         pool.execStrict(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
@@ -71,7 +70,7 @@ class PooledRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
     }
 
     it("execDrop calls to the specified URI") {
-      val pool = PooledSingleServerRequest(uri, ConnectionPoolSettings(system))
+      val pool = SingleServerRequest(uri)
       val ret = (0 until 20).map { _ ⇒
         pool.execDrop(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
