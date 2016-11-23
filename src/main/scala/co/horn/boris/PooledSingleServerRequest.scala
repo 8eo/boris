@@ -19,13 +19,12 @@ import scala.util.{Failure, Success, Try}
   * Rest client dispatcher using an Akka http pooled connection to make the requests
   *
   * @param server       The target server's address
-  * @param secure       If the connection is using https
   * @param poolSettings Settings for this particular connection pool
   * @param buffer       The size of queue that will handle back pressure on pull connection ( 0 means infinite)
   * @param system       An actor system in which to execute the requests
   * @param materializer A flow materialiser
   */
-case class PooledSingleServerRequest(server: Uri, secure: Boolean, poolSettings: ConnectionPoolSettings, buffer: Int = 10)(
+case class PooledSingleServerRequest(server: Uri, poolSettings: ConnectionPoolSettings, buffer: Int = 10)(
     implicit val system: ActorSystem,
     implicit val materializer: ActorMaterializer)
     extends RestRequests
@@ -34,7 +33,7 @@ case class PooledSingleServerRequest(server: Uri, secure: Boolean, poolSettings:
   import system.dispatcher
 
   private val pool =
-    if (secure)
+    if (server.scheme == "https")
       Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](server.authority.host.address,
                                                                   server.authority.port,
                                                                   settings = poolSettings)
