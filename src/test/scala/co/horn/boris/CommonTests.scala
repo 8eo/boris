@@ -23,17 +23,17 @@ class CommonTests extends FunSpec with ScalaFutures with Matchers {
     describe("have some requirements for initial parameters.") {
 
       it("the uri list cannot be empty") {
-        val pool = Try(RestClient(Seq.empty, ConnectionPoolSettings(system)))
+        val pool = Try(PooledMultiServerRequest(Seq.empty, ConnectionPoolSettings(system)))
         pool.failed.get shouldBe an[IllegalArgumentException]
       }
 
       it("timeouts must be greater than zero.") {
         var config = ConfigFactory.parseString("horn.boris.request-timeout = 0s").withFallback(system.settings.config)
-        var pool = Try(RestClient(Seq.empty, ConnectionPoolSettings(system), config))
+        var pool = Try(PooledMultiServerRequest(Seq.empty, ConnectionPoolSettings(system), config))
         pool.failed.get shouldBe an[IllegalArgumentException]
 
         config = ConfigFactory.parseString("horn.boris.materialize-timeout = 0s").withFallback(system.settings.config)
-        pool = Try(RestClient(Seq.empty, ConnectionPoolSettings(system), config))
+        pool = Try(PooledMultiServerRequest(Seq.empty, ConnectionPoolSettings(system), config))
         pool.failed.get shouldBe an[IllegalArgumentException]
       }
 
@@ -44,13 +44,13 @@ class CommonTests extends FunSpec with ScalaFutures with Matchers {
             |  materialize-timeout = 5s
             |}
           """.stripMargin).withFallback(system.settings.config)
-        val pool = Try(RestClient(Seq.empty, ConnectionPoolSettings(system), config))
+        val pool = Try(PooledMultiServerRequest(Seq.empty, ConnectionPoolSettings(system), config))
         pool.failed.get shouldBe an[IllegalArgumentException]
       }
 
       it("queue bufferSize must be greater than zero") {
         val config = ConfigFactory.parseString("horn.boris.bufferSize = 0").withFallback(system.settings.config)
-        val pool = Try(RestClient(Seq.empty, ConnectionPoolSettings(system), config))
+        val pool = Try(PooledMultiServerRequest(Seq.empty, ConnectionPoolSettings(system), config))
         pool.failed.get shouldBe an[IllegalArgumentException]
       }
     }

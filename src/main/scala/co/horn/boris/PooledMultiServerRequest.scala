@@ -29,14 +29,15 @@ import scala.concurrent.{Future, Promise}
   * @param materializer             A flow materializer
   */
 @throws(classOf[IllegalArgumentException])
-class RestClient(servers: Seq[Uri],
-                 poolSettings: ConnectionPoolSettings,
-                 requestTimeout: FiniteDuration,
-                 strictMaterializeTimeout: FiniteDuration,
-                 bufferSize: Int,
-                 overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew)(
+class PooledMultiServerRequest(servers: Seq[Uri],
+                               poolSettings: ConnectionPoolSettings,
+                               requestTimeout: FiniteDuration,
+                               strictMaterializeTimeout: FiniteDuration,
+                               bufferSize: Int,
+                               overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew)(
     implicit val system: ActorSystem,
-    implicit val materializer: ActorMaterializer) {
+    implicit val materializer: ActorMaterializer)
+    extends RestRequests {
 
   require(servers.nonEmpty, "Servers list cannot be empty.")
   require(requestTimeout > 0.seconds, "Request timeout must be larger than 0(zero)")
@@ -81,30 +82,19 @@ class RestClient(servers: Seq[Uri],
   }
 
   /**
-    * Execute a single request using the connection pool.
-    *
-    * @param req An HttpRequest
-    * @return The response
+    * @inheritdoc
     */
-  def exec(req: HttpRequest): Future[HttpResponse] = execHelper(req, QueueTypes.notConsumed)
+  override def exec(req: HttpRequest): Future[HttpResponse] = execHelper(req, QueueTypes.notConsumed)
 
   /**
-    * Execute a single request using the connection pool but explicitly drop the response
-    * entity.
-    *
-    * @param req An HttpRequest
-    * @return The response
+    * @inheritdoc
     */
-  def execDrop(req: HttpRequest): Future[HttpResponse] = execHelper(req, QueueTypes.drop)
+  override def execDrop(req: HttpRequest): Future[HttpResponse] = execHelper(req, QueueTypes.drop)
 
   /**
-    * Execute a single request using the connection pool strictly consuming
-    * the entity
-    *
-    * @param req An HttpRequest
-    * @return The response
+    * @inheritdoc
     */
-  def execStrict(req: HttpRequest): Future[HttpResponse] = execHelper(req, QueueTypes.strict)
+  override def execStrict(req: HttpRequest): Future[HttpResponse] = execHelper(req, QueueTypes.strict)
 
   private def execHelper(request: HttpRequest, queueType: QueueType, tries: Int = 0): Future[HttpResponse] = {
     import co.horn.boris.utils.FutureUtils.FutureWithTimeout
@@ -129,33 +119,38 @@ class RestClient(servers: Seq[Uri],
           Future.failed(e)
       }
   }
+
 }
 
-object RestClient {
+object PooledMultiServerRequest {
 
   def apply(uri: Uri, poolSettings: ConnectionPoolSettings, config: Config)(
       implicit system: ActorSystem,
-      materializer: ActorMaterializer): RestClient = {
+      materializer: ActorMaterializer): PooledMultiServerRequest = {
     apply(Seq(uri), poolSettings, config)(system, materializer)
   }
 
-  def apply(uri: Uri, poolSettings: ConnectionPoolSettings)(implicit system: ActorSystem,
-                                                            materializer: ActorMaterializer): RestClient = {
+  def apply(uri: Uri, poolSettings: ConnectionPoolSettings)(
+      implicit system: ActorSystem,
+      materializer: ActorMaterializer): PooledMultiServerRequest = {
     apply(Seq(uri), poolSettings, system.settings.config)(system, materializer)
   }
 
-  def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(implicit system: ActorSystem,
-                                                                     materializer: ActorMaterializer): RestClient = {
+  def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(
+      implicit system: ActorSystem,
+      materializer: ActorMaterializer): PooledMultiServerRequest = {
     apply(servers, poolSettings, system.settings.config)(system, materializer)
   }
 
   def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings, config: Config)(
       implicit system: ActorSystem,
-      materializer: ActorMaterializer): RestClient = {
+      materializer: ActorMaterializer): PooledMultiServerRequest = {
     val conf = config.getConfig("horn.boris")
     val requestTimeout = conf.getDuration("request-timeout", TimeUnit.MILLISECONDS).millis
     val strictMaterializeTimeout = conf.getDuration("materialize-timeout", TimeUnit.MILLISECONDS).millis
     val bufferSize = conf.getInt("bufferSize")
-    new RestClient(servers, poolSettings, requestTimeout, strictMaterializeTimeout, bufferSize)(system, materializer)
+    new PooledMultiServerRequest(servers, poolSettings, requestTimeout, strictMaterializeTimeout, bufferSize)(
+      system,
+      materializer)
   }
 }

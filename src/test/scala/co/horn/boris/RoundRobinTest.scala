@@ -9,6 +9,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.client.RequestBuilding._
 import akka.http.scaladsl.model.{StatusCodes, Uri}
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.{ActorMaterializer, BufferOverflowException, StreamTcpException}
@@ -19,7 +20,6 @@ import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration._
 
 class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
 
@@ -28,7 +28,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
   implicit val patience = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
 
   // Very simple routing that just returns the current server instance
-  def route(instance: Int) = get {
+  def route(instance: Int): Route = get {
     path("bumble") {
       complete(StatusCodes.OK, instance.toString)
     } ~
@@ -42,9 +42,9 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       }
   }
 
-  var servers = Seq[ServerBinding]()
-  val instances = 0 until 5
-  val uri = instances.map(i ⇒ Uri(s"http://localhost:${10100 + i}"))
+  private var servers = Seq[ServerBinding]()
+  private val instances = 0 until 5
+  private val uri = instances.map(i ⇒ Uri(s"http://localhost:${10100 + i}"))
 
   override def beforeEach {
     Http(system).shutdownAllConnectionPools() // Terminate all pools so the servers can actually shut down
@@ -58,7 +58,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
   describe("The round robin scheduler") {
 
     it("visits the servers in turn") {
-      val pool = RestClient(uri, ConnectionPoolSettings(system))
+      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system))
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
@@ -67,7 +67,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
 
     it("catches a failed server") {
       servers(1).unbind.futureValue // This is not reliably shutting down this server
-      val pool = RestClient(uri, ConnectionPoolSettings(system))
+      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system))
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
@@ -76,7 +76,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
 
     it("fails if no servers are able to serve the request") {
       val pool =
-        RestClient(Seq(Uri("http://localhost:10123"), Uri("http://localhost:10124"), Uri("http://localhost:10125")),
+        PooledMultiServerRequest(Seq(Uri("http://localhost:10123"), Uri("http://localhost:10124"), Uri("http://localhost:10125")),
                    ConnectionPoolSettings(system))
       pool
         .exec(Get("/bumble"))
@@ -94,7 +94,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
           |  materialize-timeout = 0.4s
           |}
         """.stripMargin).withFallback(system.settings.config)
-      val pool = RestClient(uri, ConnectionPoolSettings(system), config)
+      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), config)
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
@@ -106,7 +106,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
 
     it("will fails when buffer size will be too small") {
       val config = ConfigFactory.parseString("horn.boris.bufferSize = 10").withFallback(system.settings.config)
-      val pool = RestClient(uri, ConnectionPoolSettings(system), config)
+      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), config)
       val ret = (0 until 512).map { i ⇒
         pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
@@ -114,14 +114,14 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     }
 
     it("will work fine if buffer size is proper") {
-      val pool = RestClient(uri, ConnectionPoolSettings(system))
+      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system))
       val ret = (0 until 512).map { i ⇒
         pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
       Future.sequence(ret).futureValue
     }
 
-    it("beats the client without queue") {
+    it("beats the client without queue") { // TODO: What does this actually test?
       val pool = RestClientWithoutQueue(uri.head, ConnectionPoolSettings(system))
       val ret = (0 until 100).map { i ⇒
         pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
