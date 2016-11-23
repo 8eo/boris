@@ -1,6 +1,5 @@
 package co.horn.boris
 
-import java.util.concurrent.TimeUnit
 import java.util.function.IntUnaryOperator
 
 import akka.actor.ActorSystem
@@ -10,7 +9,6 @@ import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import co.horn.boris.QueueTypes.QueueType
-import com.typesafe.config.Config
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
@@ -28,7 +26,6 @@ import scala.concurrent.{Future, Promise}
   * @param system                   An actor system in which to execute the requests
   * @param materializer             A flow materializer
   */
-
 @throws(classOf[IllegalArgumentException])
 class PooledMultiServerRequest(servers: Seq[Uri],
                                poolSettings: ConnectionPoolSettings,
@@ -41,11 +38,6 @@ class PooledMultiServerRequest(servers: Seq[Uri],
     extends RestRequests {
 
   require(servers.nonEmpty, "Servers list cannot be empty.")
-  require(requestTimeout > 0.seconds, "Request timeout must be larger than 0(zero)")
-  require(strictMaterializeTimeout > 0.seconds, "Timeout for entity materialization must be larger than 0(zero)")
-  require(requestTimeout > strictMaterializeTimeout,
-          "Request timeout must be larger than timeout for entity materialization")
-  require(bufferSize > 0, "Queue buffer size must be larger than 0(zero)")
 
   import java.util.concurrent.atomic.AtomicInteger
 
@@ -124,34 +116,14 @@ class PooledMultiServerRequest(servers: Seq[Uri],
 }
 
 object PooledMultiServerRequest {
-
-  def apply(uri: Uri, poolSettings: ConnectionPoolSettings, config: Config)(
+  def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings, settings: BorisSettings)(
       implicit system: ActorSystem,
       materializer: ActorMaterializer): PooledMultiServerRequest = {
-    apply(Seq(uri), poolSettings, config)(system, materializer)
-  }
-
-  def apply(uri: Uri, poolSettings: ConnectionPoolSettings)(
-      implicit system: ActorSystem,
-      materializer: ActorMaterializer): PooledMultiServerRequest = {
-    apply(Seq(uri), poolSettings, system.settings.config)(system, materializer)
-  }
-
-  def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings)(
-      implicit system: ActorSystem,
-      materializer: ActorMaterializer): PooledMultiServerRequest = {
-    apply(servers, poolSettings, system.settings.config)(system, materializer)
-  }
-
-  def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings, config: Config)(
-      implicit system: ActorSystem,
-      materializer: ActorMaterializer): PooledMultiServerRequest = {
-    val conf = config.getConfig("horn.boris")
-    val requestTimeout = conf.getDuration("request-timeout", TimeUnit.MILLISECONDS).millis
-    val strictMaterializeTimeout = conf.getDuration("materialize-timeout", TimeUnit.MILLISECONDS).millis
-    val bufferSize = conf.getInt("bufferSize")
-    new PooledMultiServerRequest(servers, poolSettings, requestTimeout, strictMaterializeTimeout, bufferSize)(
-      system,
-      materializer)
+    new PooledMultiServerRequest(servers,
+                                 poolSettings,
+                                 settings.requestTimeout,
+                                 settings.strictMaterializeTimeout,
+                                 settings.bufferSize,
+                                 settings.overflowStrategy)
   }
 }

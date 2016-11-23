@@ -8,15 +8,15 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.client.RequestBuilding.Get
 import akka.http.scaladsl.model.{StatusCodes, Uri}
-import akka.http.scaladsl.server.Directives.{complete, get, path}
+import akka.http.scaladsl.server.Directives.{complete, get, path, _}
 import akka.http.scaladsl.server.Route
-import akka.stream.ActorMaterializer
-import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.time.{Milliseconds, Seconds, Span}
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.stream.ActorMaterializer
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.time.{Milliseconds, Seconds, Span}
+import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class PooledRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
@@ -55,7 +55,7 @@ class PooledRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
   describe("Pooled single server requests") {
 
     it("exec calls to the specified URI") {
-      val pool = PooledSingleServerRequest(uri, ConnectionPoolSettings(system))
+      val pool = PooledSingleServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
@@ -63,7 +63,7 @@ class PooledRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
     }
 
     it("execStrict calls to the specified URI") {
-      val pool = PooledSingleServerRequest(uri, ConnectionPoolSettings(system))
+      val pool = PooledSingleServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
         pool.execStrict(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
@@ -71,7 +71,7 @@ class PooledRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
     }
 
     it("execDrop calls to the specified URI") {
-      val pool = PooledSingleServerRequest(uri, ConnectionPoolSettings(system))
+      val pool = PooledSingleServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
         pool.execDrop(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
