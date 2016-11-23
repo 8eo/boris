@@ -18,5 +18,7 @@ object RestClientFactory {
     PooledMultiServerRequest(servers, connectionPoolSettings, settings)
 
   def singleClient(server: Uri, settings: BorisSettings)(implicit system: ActorSystem,
-                                                         materializer: ActorMaterializer): RestRequests = ???
+                                                         materializer: ActorMaterializer): RestRequests =
+    SingleServerRequest(server, settings)
+
 }

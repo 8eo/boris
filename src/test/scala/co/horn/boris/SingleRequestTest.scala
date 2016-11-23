@@ -54,7 +54,7 @@ class SingleRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
   describe("Single server requests") {
 
     it("exec calls to the specified URI") {
-      val pool = SingleServerRequest(uri)
+      val pool = SingleServerRequest(uri, BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
@@ -62,7 +62,7 @@ class SingleRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
     }
 
     it("execStrict calls to the specified URI") {
-      val pool = SingleServerRequest(uri)
+      val pool = SingleServerRequest(uri, BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
         pool.execStrict(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
@@ -70,7 +70,7 @@ class SingleRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
     }
 
     it("execDrop calls to the specified URI") {
-      val pool = SingleServerRequest(uri)
+      val pool = SingleServerRequest(uri, BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
         pool.execDrop(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
