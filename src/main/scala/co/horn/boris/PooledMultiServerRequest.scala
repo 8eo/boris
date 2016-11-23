@@ -27,12 +27,12 @@ import scala.concurrent.{Future, Promise}
   * @param materializer             A flow materializer
   */
 @throws(classOf[IllegalArgumentException])
-class PooledMultiServerRequest(servers: Seq[Uri],
-                               poolSettings: ConnectionPoolSettings,
-                               requestTimeout: FiniteDuration,
-                               strictMaterializeTimeout: FiniteDuration,
-                               bufferSize: Int,
-                               overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew)(
+private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
+                                              poolSettings: ConnectionPoolSettings,
+                                              requestTimeout: FiniteDuration,
+                                              strictMaterializeTimeout: FiniteDuration,
+                                              bufferSize: Int,
+                                              overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew)(
     implicit val system: ActorSystem,
     implicit val materializer: ActorMaterializer)
     extends RestRequests {
