@@ -47,6 +47,18 @@ class BorisSettingsTest extends FunSpec with ScalaFutures with Matchers {
         val settings = Try(BorisSettings(config))
         settings.failed.get shouldBe an[IllegalArgumentException]
       }
+
+      it("failure threshold must be larger than 0(zero)") {
+        val config = ConfigFactory.parseString("dead-server.failure-threshold = 0").withFallback(systemConfig)
+        val settings = Try(BorisSettings(config))
+        settings.failed.get shouldBe an[IllegalArgumentException]
+      }
+
+      it("minimum count of available servers cannot be lower than 0(zero)") {
+        val config = ConfigFactory.parseString("dead-server.min-available-servers = -1").withFallback(systemConfig)
+        val settings = Try(BorisSettings(config))
+        settings.failed.get shouldBe an[IllegalArgumentException]
+      }
     }
   }
 }

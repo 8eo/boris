@@ -78,13 +78,15 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
-      ret.toSet should contain only("0", "2", "3", "4")
+      ret.toSet should contain only ("0", "2", "3", "4")
     }
 
     it("fails if no servers are able to serve the request") {
       val pool =
-        PooledMultiServerRequest(Seq(Uri("http://localhost:10123"), Uri("http://localhost:10124"), Uri("http://localhost:10125")),
-          ConnectionPoolSettings(system), BorisSettings(system))
+        PooledMultiServerRequest(
+          Seq(Uri("http://localhost:10123"), Uri("http://localhost:10124"), Uri("http://localhost:10125")),
+          ConnectionPoolSettings(system),
+          BorisSettings(system))
       pool
         .exec(Get("/bumble"))
         .flatMap(f ⇒ Unmarshal(f.entity).to[String])
@@ -95,8 +97,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     }
 
     it("handles servers that time out") {
-      val config = ConfigFactory.parseString(
-        """
+      val config = ConfigFactory.parseString("""
           |  request-timeout = 0.5s
           |  materialize-timeout = 0.4s
         """.stripMargin).withFallback(systemConfig)
@@ -104,7 +105,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       val ret = (0 until 20).map { i ⇒
         pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
-      ret.toSet should contain only("0", "2", "3", "4") // Server "1" is slow
+      ret.toSet should contain only ("0", "2", "3", "4") // Server "1" is slow
     }
   }
 
@@ -120,7 +121,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     }
 
     it("will work fine if buffer size is proper") {
-      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system),BorisSettings(system))
+      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
       val ret = (0 until 512).map { i ⇒
         pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }

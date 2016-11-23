@@ -9,7 +9,9 @@ import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import co.horn.boris.QueueTypes.QueueType
+import co.horn.boris.utils.Ref
 
+import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 
@@ -24,6 +26,7 @@ import scala.concurrent.{Future, Promise}
   * @param bufferSize               Maximum size for backpressure queue. If all connection ale in use, the request will wait there to be executed.
   *                                 should be bigger than akka.http.client.host-connection-pool.max-open-requests(default 32)
   * @param overflowStrategy         Queue backpressure strategy, What to do when the queue is full(default drop new request)
+  * @param deadServerStrategy       Describes if and when the server is Considered as dead and for how long it will be suspended.
   * @param system                   An actor system in which to execute the requests
   * @param materializer             A flow materializer
   */
@@ -34,7 +37,8 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
                                               requestTimeout: FiniteDuration,
                                               strictMaterializeTimeout: FiniteDuration,
                                               bufferSize: Int,
-                                              overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew)(
+                                              overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew,
+                                              deadServerStrategy: Option[DeadServerStrategy])(
     implicit val system: ActorSystem,
     implicit val materializer: ActorMaterializer)
     extends RestRequests {
@@ -63,6 +67,9 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
 
   private val poolSize = queues.size // Run once through the server pool before giving up
 
+  private[boris] case class ServerFailure(id: Int, times: Int, suspendedTill: Option[Long])
+  private val serverFailures = Ref(servers.zipWithIndex.map(r ⇒ ServerFailure(r._2, 0, None)))
+
   /**
     * Determines next connection pool to use, returning both the pool and
     * the index number of the pool in a thread safe way
@@ -71,9 +78,34 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
     */
   private def nextFlow(queue: QueueType) = {
     val n = poolIndex.getAndUpdate(new IntUnaryOperator {
-      override def applyAsInt(operand: Int): Int = (operand + 1) % poolSize
+      override def applyAsInt(operand: Int): Int = {
+        def availableServers() =
+          serverFailures.get.filter(_.suspendedTill.forall(time ⇒ time < System.currentTimeMillis)).map(_.id)
+        @tailrec
+        def _help(id: Int, ids: Seq[Int]): Int = {
+          if (ids.contains(id)) id
+          else _help((id + 1) % poolSize, availableServers())
+        }
+        _help((operand + 1) % poolSize, availableServers())
+      }
     })
     n → queues(n)(queue)
+  }
+
+  private def serverFailure(id: Int) = deadServerStrategy.map { strategy ⇒
+    serverFailures.transformAndGet { list ⇒
+      val dead = list.count(_.suspendedTill.isDefined)
+      val count = list(id).times + 1
+      val time = if (count >= strategy.failureThreshold && dead <= strategy.availableServersMinimum) {
+        Some(System.currentTimeMillis + strategy.suspendTime.toMillis)
+      } else None
+      list.updated(id, ServerFailure(id, count, time))
+    }
+  }
+
+  private def serverSuccess(id: Int) = serverFailures.transformAndGet { list ⇒
+    val count = Math.max(0, list(id).times - 1)
+    list.updated(id, ServerFailure(id, count, None))
   }
 
   /**
@@ -102,11 +134,17 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
         case other ⇒ Future.failed(EnqueueRequestFails(other))
       }
       .withTimeout(requestTimeout)
+      .map { resp ⇒
+        serverSuccess(idx)
+        resp
+      }
       .recoverWith {
         case t: Throwable if tries < poolSize ⇒
+          serverFailure(idx)
           system.log.warning(s"Request to ${request.uri} failed on ${servers(idx)}: Failure was ${t.getMessage}")
           execHelper(request, queueType, tries + 1)
         case t: Throwable if tries >= poolSize ⇒
+          serverFailure(idx)
           system.log.error(s"Request to ${request.uri} failed (no servers available), : Failure was ${t.getMessage}")
           Future.failed(NoServersResponded(t))
         case e ⇒
@@ -114,7 +152,6 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
           Future.failed(e)
       }
   }
-
 }
 
 object PooledMultiServerRequest {
@@ -127,6 +164,7 @@ object PooledMultiServerRequest {
                                  settings.requestTimeout,
                                  settings.strictMaterializeTimeout,
                                  settings.bufferSize,
-                                 settings.overflowStrategy)
+                                 settings.overflowStrategy,
+                                 settings.deadServerStrategy)
   }
 }
