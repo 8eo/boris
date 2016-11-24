@@ -32,16 +32,6 @@ class BorisSettingsTest extends FunSpec with ScalaFutures with Matchers {
         settings.failed.get shouldBe an[IllegalArgumentException]
       }
 
-      it("request timeout must be larger than timeout for entity materialization") {
-        val config = ConfigFactory.parseString(
-          """
-            | request-timeout = 4s
-            | materialize-timeout = 5s
-          """.stripMargin).withFallback(systemConfig)
-        val settings = Try(BorisSettings(config))
-        settings.failed.get shouldBe an[IllegalArgumentException]
-      }
-
       it("queue bufferSize must be greater than zero") {
         val config = ConfigFactory.parseString("bufferSize = 0").withFallback(systemConfig)
         val settings = Try(BorisSettings(config))

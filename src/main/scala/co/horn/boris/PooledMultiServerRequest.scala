@@ -8,6 +8,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.QueueOfferResult.Enqueued
+import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import co.horn.boris.QueueTypes.QueueType
 import co.horn.boris.utils.Ref
@@ -73,7 +74,7 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
 
   private val poolIndex: AtomicInteger = new AtomicInteger()
   private val poolSize = queues.size
-  private val serverFailures = Ref(servers.zipWithIndex.map(r ⇒ ServerFailure(r._2, 0, None)))
+  private val serverFailures = Ref(servers.indices.map(idx ⇒ ServerFailure(idx, 0, None)))
 
   /**
     * Determines next connection pool to use, returning both the pool and
@@ -81,7 +82,9 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
     *
     * @return A tuple (pool index, pool)
     */
-  private def nextFlow(queue: QueueType) = {
+  private def nextFlow(
+      queue: QueueType): Option[(Int, SourceQueueWithComplete[(HttpRequest, Promise[HttpResponse])])] = {
+    val NO_AVAILABLE_SERVERS = -1
     val n = poolIndex.getAndUpdate(new IntUnaryOperator {
       override def applyAsInt(operand: Int): Int = {
         //find all server that are not suspended
@@ -89,13 +92,14 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
           serverFailures.get.filter(_.suspendedTill.forall(time ⇒ time < System.currentTimeMillis)).map(_.id)
         @tailrec
         def _pickServer(id: Int, ids: Seq[Int]): Int = {
-          if (ids.contains(id)) id
+          if (ids.isEmpty) NO_AVAILABLE_SERVERS
+          else if (ids.contains(id)) id
           else _pickServer((id + 1) % poolSize, availableServers())
         }
         _pickServer((operand + 1) % poolSize, availableServers())
       }
     })
-    n → queues(n)(queue)
+    if (n >= 0) Some(n → queues(n)(queue)) else None
   }
 
   /**
@@ -110,7 +114,7 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
       val deadServers = servers.count(_.suspendedTill.isDefined)
       // check if failure Count of given server reached threshold, than check if the number of available servers is enough
       val suspension =
-        if (failureCount >= strategy.failureThreshold && deadServers <= strategy.availableServersMinimum) {
+        if (failureCount >= strategy.failureThreshold && (poolSize - deadServers) > strategy.availableServersMinimum) {
           Some(System.currentTimeMillis + strategy.suspendTime.toMillis)
         } else None
       servers.updated(id, ServerFailure(id, failureCount, suspension))
@@ -124,8 +128,7 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
     */
   private def serverSuccess(id: Int) = if (deadServerStrategy.isDefined) {
     serverFailures.transformAndGet { servers ⇒
-      val count = Math.max(0, servers(id).failureCount - 1)
-      servers.updated(id, ServerFailure(id, count, None))
+      servers.updated(id, ServerFailure(id, 0, None))
     }
   }
 
@@ -146,29 +149,33 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
 
   private def execHelper(request: HttpRequest, queueType: QueueType, tries: Int = 0): Future[HttpResponse] = {
     import co.horn.boris.utils.FutureUtils.FutureWithTimeout
-    val (idx, flow) = nextFlow(queueType)
-    val promise = Promise[HttpResponse]
-    flow
-      .offer(request -> promise)
-      .flatMap {
-        case Enqueued ⇒ promise.future
-        case other ⇒ Future.failed(EnqueueRequestFails(other))
-      }
-      .withTimeout(requestTimeout)
-      .map { resp ⇒
-        serverSuccess(idx)
-        resp
-      }
-      .recoverWith {
-        case t: Throwable if tries < poolSize ⇒
-          serverFailure(idx)
-          system.log.warning(s"Request to ${request.uri} failed on ${servers(idx)}: Failure was ${t.getMessage}")
-          execHelper(request, queueType, tries + 1)
-        case t: Throwable if tries >= poolSize ⇒
-          serverFailure(idx)
-          system.log.error(s"Request to ${request.uri} failed (no servers available), : Failure was ${t.getMessage}")
-          Future.failed(NoServersResponded(t))
-      }
+    nextFlow(queueType) match {
+      case None ⇒ Future.failed(NoServersResponded(AllServerAreMarkedAsDead))
+      case Some((idx, flow)) ⇒
+        val promise = Promise[HttpResponse]
+        flow
+          .offer(request -> promise)
+          .flatMap {
+            case Enqueued ⇒ promise.future
+            case other ⇒ Future.failed(EnqueueRequestFails(other))
+          }
+          .withTimeout(requestTimeout)
+          .map { resp ⇒
+            serverSuccess(idx)
+            resp
+          }
+          .recoverWith {
+            case t: Throwable if tries < poolSize ⇒
+              serverFailure(idx)
+              system.log.warning(s"Request to ${request.uri} failed on ${servers(idx)}: Failure was ${t.getMessage}")
+              execHelper(request, queueType, tries + 1)
+            case t: Throwable if tries >= poolSize ⇒
+              serverFailure(idx)
+              system.log.error(
+                s"Request to ${request.uri} failed (no servers available), : Failure was ${t.getMessage}")
+              Future.failed(NoServersResponded(t))
+          }
+    }
   }
 }
 
@@ -177,9 +184,9 @@ object PooledMultiServerRequest {
   /**
     * Constructor of multiple servers pool client.
     *
-    * @param servers The list of servers URI
+    * @param servers      The list of servers URI
     * @param poolSettings The pool connection settings
-    * @param settings Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
+    * @param settings     Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
     * @return PooledMultiServerRequest rest client
     */
   def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings, settings: BorisSettings)(

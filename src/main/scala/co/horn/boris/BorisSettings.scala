@@ -49,8 +49,6 @@ case class BorisSettings(name: String,
 
   require(requestTimeout > 0.seconds, "Request timeout must be larger than 0(zero)")
   require(strictMaterializeTimeout > 0.seconds, "Timeout for entity materialization must be larger than 0(zero)")
-  require(requestTimeout > strictMaterializeTimeout,
-          "Request timeout must be larger than timeout for entity materialization")
   require(bufferSize > 0, "Queue buffer size must be larger than 0(zero)")
   require(deadServerStrategy.forall(_.failureThreshold > 0), "Failure threshold must be larger than 0(zero)")
   require(deadServerStrategy.forall(_.availableServersMinimum >= 0),
