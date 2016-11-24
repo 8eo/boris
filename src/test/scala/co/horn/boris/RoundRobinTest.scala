@@ -27,7 +27,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
   implicit val system = ActorSystem("Test")
   implicit val materializer = ActorMaterializer()
   implicit val patience = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
-  val systemConfig = system.settings.config.getConfig("horn.boris")
+  private val systemConfig = system.settings.config.getConfig("horn.boris")
 
   // Very simple routing that just returns the current server instance
   def route(instance: Int): Route = get {
@@ -66,7 +66,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
 
     it("visits the servers in turn") {
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
-      val ret = (0 until 20).map { i ⇒
+      val ret = (0 until 20).map { _ ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
       (0 until 5).foreach(i ⇒ ret.count(_ == i.toString) shouldBe 4)
@@ -75,7 +75,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     it("catches a failed server") {
       servers(1).unbind.futureValue // This is not reliably shutting down this server
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
-      val ret = (0 until 20).map { i ⇒
+      val ret = (0 until 20).map { _ ⇒
         pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
       ret.toSet should contain only ("0", "2", "3", "4")
@@ -102,27 +102,43 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
           |  materialize-timeout = 0.4s
         """.stripMargin).withFallback(systemConfig)
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(config))
-      val ret = (0 until 20).map { i ⇒
+      val ret = (0 until 20).map { _ ⇒
         pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
       ret.toSet should contain only ("0", "2", "3", "4") // Server "1" is slow
+    }
+
+    it("works with strict entity mode") {
+      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
+      val ret = (0 until 20).map { _ ⇒
+        pool.execStrict(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
+      }
+      (0 until 5).foreach(i ⇒ ret.count(_ == i.toString) shouldBe 4)
+    }
+
+    it("works with strict drop mode") {
+      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
+      val ret = (0 until 20).map { _ ⇒
+        pool.execDrop(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
+      }
+      (0 until 5).foreach(i ⇒ ret.count(_ == i.toString) shouldBe 4)
     }
   }
 
   describe("The RestClient") {
 
-    it("will fails when buffer size will be too small") {
+    it("will fail when queue size is overrun") {
       val config = ConfigFactory.parseString("bufferSize = 10").withFallback(systemConfig)
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(config))
-      val ret = (0 until 512).map { i ⇒
+      val ret = (0 until 512).map { _ ⇒
         pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
       Future.sequence(ret).failed.futureValue.asInstanceOf[NoServersResponded].cause shouldBe a[EnqueueRequestFails]
     }
 
-    it("will work fine if buffer size is proper") {
+    it("buffers requests in the queue when accessing a slow server") {
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
-      val ret = (0 until 512).map { i ⇒
+      val ret = (0 until 512).map { _ ⇒
         pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
       Future.sequence(ret).futureValue
