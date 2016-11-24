@@ -133,10 +133,19 @@ private[boris] class PooledSingleServerRequest(server: Uri,
 }
 
 object PooledSingleServerRequest {
-  def apply(uri: Uri, poolSettings: ConnectionPoolSettings, settings: BorisSettings)(
+
+  /**
+    * Constructor of pool connection rest client.
+    *
+    * @param server The server uri
+    * @param poolSettings The pool connection settings
+    * @param settings Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
+    * @return PooledMultiServerRequest rest client
+    */
+  def apply(server: Uri, poolSettings: ConnectionPoolSettings, settings: BorisSettings)(
       implicit system: ActorSystem,
       materializer: ActorMaterializer): PooledSingleServerRequest = {
-    new PooledSingleServerRequest(uri,
+    new PooledSingleServerRequest(server,
                                   poolSettings,
                                   settings.name,
                                   settings.requestTimeout,

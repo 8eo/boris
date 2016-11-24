@@ -1,5 +1,6 @@
 package co.horn.boris
 
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.IntUnaryOperator
 
 import akka.actor.ActorSystem
@@ -14,6 +15,15 @@ import co.horn.boris.utils.Ref
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
+
+/**
+  * Object that store information about server failures.
+  *
+  * @param id            Id of server
+  * @param failureCount  Server failure counter.
+  * @param suspendedTill Option that keep information if server has been considered as dead and for how long it will be out of use.
+  */
+private[boris] case class ServerFailure(id: Int, failureCount: Int, suspendedTill: Option[Long])
 
 /**
   * Rest client dispatcher using an Akka http pooled connection to make the requests
@@ -45,8 +55,6 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
 
   require(servers.nonEmpty, "Servers list cannot be empty.")
 
-  import java.util.concurrent.atomic.AtomicInteger
-
   import system.dispatcher
 
   // A pool of Flows that will execute the HTTP requests via a connection pool
@@ -64,10 +72,7 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
   }
 
   private val poolIndex: AtomicInteger = new AtomicInteger()
-
-  private val poolSize = queues.size // Run once through the server pool before giving up
-
-  private[boris] case class ServerFailure(id: Int, times: Int, suspendedTill: Option[Long])
+  private val poolSize = queues.size
   private val serverFailures = Ref(servers.zipWithIndex.map(r ⇒ ServerFailure(r._2, 0, None)))
 
   /**
@@ -79,33 +84,49 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
   private def nextFlow(queue: QueueType) = {
     val n = poolIndex.getAndUpdate(new IntUnaryOperator {
       override def applyAsInt(operand: Int): Int = {
+        //find all server that are not suspended
         def availableServers() =
           serverFailures.get.filter(_.suspendedTill.forall(time ⇒ time < System.currentTimeMillis)).map(_.id)
         @tailrec
-        def _help(id: Int, ids: Seq[Int]): Int = {
+        def _pickServer(id: Int, ids: Seq[Int]): Int = {
           if (ids.contains(id)) id
-          else _help((id + 1) % poolSize, availableServers())
+          else _pickServer((id + 1) % poolSize, availableServers())
         }
-        _help((operand + 1) % poolSize, availableServers())
+        _pickServer((operand + 1) % poolSize, availableServers())
       }
     })
     n → queues(n)(queue)
   }
 
+  /**
+    * Count server failures, and mark server as dead when failures count reaches the threshold.
+    * That function is thread safe
+    *
+    * @param id Id of server that failed
+    */
   private def serverFailure(id: Int) = deadServerStrategy.map { strategy ⇒
-    serverFailures.transformAndGet { list ⇒
-      val dead = list.count(_.suspendedTill.isDefined)
-      val count = list(id).times + 1
-      val time = if (count >= strategy.failureThreshold && dead <= strategy.availableServersMinimum) {
-        Some(System.currentTimeMillis + strategy.suspendTime.toMillis)
-      } else None
-      list.updated(id, ServerFailure(id, count, time))
+    serverFailures.transformAndGet { servers ⇒
+      val failureCount = servers(id).failureCount + 1
+      val deadServers = servers.count(_.suspendedTill.isDefined)
+      // check if failure Count of given server reached threshold, than check if the number of available servers is enough
+      val suspension =
+        if (failureCount >= strategy.failureThreshold && deadServers <= strategy.availableServersMinimum) {
+          Some(System.currentTimeMillis + strategy.suspendTime.toMillis)
+        } else None
+      servers.updated(id, ServerFailure(id, failureCount, suspension))
     }
   }
 
-  private def serverSuccess(id: Int) = serverFailures.transformAndGet { list ⇒
-    val count = Math.max(0, list(id).times - 1)
-    list.updated(id, ServerFailure(id, count, None))
+  /**
+    * Reset the failures counter of server when it is reachable.
+    *
+    * @param id Id of server that execute request properly
+    */
+  private def serverSuccess(id: Int) = if (deadServerStrategy.isDefined) {
+    serverFailures.transformAndGet { servers ⇒
+      val count = Math.max(0, servers(id).failureCount - 1)
+      servers.updated(id, ServerFailure(id, count, None))
+    }
   }
 
   /**
@@ -147,14 +168,20 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
           serverFailure(idx)
           system.log.error(s"Request to ${request.uri} failed (no servers available), : Failure was ${t.getMessage}")
           Future.failed(NoServersResponded(t))
-        case e ⇒
-          system.log.error(s"Request failed due to unknown exception: $e")
-          Future.failed(e)
       }
   }
 }
 
 object PooledMultiServerRequest {
+
+  /**
+    * Constructor of multiple servers pool client.
+    *
+    * @param servers The list of servers URI
+    * @param poolSettings The pool connection settings
+    * @param settings Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
+    * @return PooledMultiServerRequest rest client
+    */
   def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings, settings: BorisSettings)(
       implicit system: ActorSystem,
       materializer: ActorMaterializer): PooledMultiServerRequest = {

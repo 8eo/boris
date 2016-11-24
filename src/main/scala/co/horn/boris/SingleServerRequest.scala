@@ -58,8 +58,16 @@ private[boris] class SingleServerRequest(server: Uri,
 }
 
 object SingleServerRequest {
-  def apply(uri: Uri, settings: BorisSettings)(implicit system: ActorSystem,
-                                               materializer: ActorMaterializer): SingleServerRequest = {
-    new SingleServerRequest(uri, settings.requestTimeout, settings.strictMaterializeTimeout)
+
+  /**
+    * Constructor of single connection rest client.
+    *
+    * @param server The server uri
+    * @param settings Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
+    * @return PooledMultiServerRequest rest client
+    */
+  def apply(server: Uri, settings: BorisSettings)(implicit system: ActorSystem,
+                                                  materializer: ActorMaterializer): SingleServerRequest = {
+    new SingleServerRequest(server, settings.requestTimeout, settings.strictMaterializeTimeout)
   }
 }
