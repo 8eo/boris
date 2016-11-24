@@ -2,7 +2,7 @@ package co.horn
 
 import akka.http.scaladsl.Http.HostConnectionPool
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 
 import scala.concurrent.duration.FiniteDuration
@@ -26,7 +26,7 @@ package object boris {
       f: PartialFunction[(Try[HttpResponse], Promise[HttpResponse]), Unit],
       bufferSize: Int,
       overflowStrategy: OverflowStrategy,
-      name: String)(implicit materializer: ActorMaterializer) =
+      name: String)(implicit materializer: ActorMaterializer): SourceQueueWithComplete[(HttpRequest, Promise[HttpResponse])] =
     Source
       .queue[(HttpRequest, Promise[HttpResponse])](bufferSize, overflowStrategy)
       .named(name)

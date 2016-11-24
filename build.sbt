@@ -1,9 +1,11 @@
-organization := "co.horn"
 name := "boris"
-version := "0.0.2"
+organization := "co.horn"
+version := "0.0.3"
 scalaVersion := "2.11.8"
+crossScalaVersions := Seq("2.11.8", "2.12.0")
 fork in Test := true
-scalafmtConfig := Some(file(".scalafmt"))
+scalafmtConfig := Some(file(".scalafmt.conf"))
+
 scalacOptions ++= Seq(
   "-unchecked",
   "-deprecation",
@@ -14,16 +16,12 @@ scalacOptions ++= Seq(
   "-language:postfixOps")
 
 libraryDependencies ++= {
-  val akkaV        = "2.4.13"
-  val akkaHttpV    = "2.4.11"
-  val scalaTestV   = "2.2.6"
+  val akkaHttpV    = "10.0.0"
+  val scalaTestV   = "3.0.1"
   Seq(
-    "com.typesafe.akka"   %% "akka-actor"                         % akkaV,
-    "com.typesafe.akka"   %% "akka-stream"                        % akkaV,
-    "com.typesafe.akka"   %% "akka-http-core"                     % akkaHttpV,
-    "com.typesafe.akka"   %% "akka-http-experimental"             % akkaHttpV,
-    "com.typesafe.akka"   %% "akka-http-spray-json-experimental"  % akkaHttpV,
-    "com.typesafe.akka"   %% "akka-http-testkit"                  % akkaHttpV     % "test",
-    "org.scalatest"       %% "scalatest"                          % scalaTestV    % "test"
+    "com.typesafe.akka"   %% "akka-http"             % akkaHttpV,
+    "com.typesafe.akka"   %% "akka-http-spray-json"  % akkaHttpV,
+    "com.typesafe.akka"   %% "akka-http-testkit"     % akkaHttpV     % "test",
+    "org.scalatest"       %% "scalatest"             % scalaTestV    % "test"
   )
 }
