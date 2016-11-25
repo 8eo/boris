@@ -180,7 +180,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       Future.sequence(ret).failed.futureValue.asInstanceOf[NoServersResponded].cause should be(
         AllServerAreMarkedAsDead)
 
-      Thread.sleep(1000)
+      Thread.sleep(2000)
 
       val ret2 = uri.indices.map { _ ⇒
         pool.exec(Get("/slow/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
