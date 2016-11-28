@@ -75,7 +75,9 @@ queues. These are the `OverflowStrategy` methods provided by Akka Streams
 ## Configuration ##
 
 The default configuration for Boris is given below. The configurations can be overridden
-in various ways using the methods in `RestClientFactory`.
+in various ways using the methods in `RestClientFactory`. There are two separate configurations. 
+One specifies the connection pool configuration (`ConnectionPoolSettings`) and the other configures
+Boris (`BorisConfig`). The Boris configuration parameters are presented below.
 
 ```hocon
 horn.boris {
@@ -93,6 +95,7 @@ horn.boris {
   }
 }
 ```
+
 
 
 # Contribution policy #
