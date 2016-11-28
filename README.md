@@ -1,3 +1,5 @@
+![Build Status](https://travis-ci.org/8eo/boris.svg?branch=development)
+
 # Boris #
 
 Boris the Russian can not be killed! The goal is to provide a robust, reactive and 
