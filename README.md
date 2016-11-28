@@ -36,7 +36,6 @@ object SnatchSomeService {
   // Perform the request on the next server in the list
   val res = client.exec(Get("/some/service")).map(r ⇒ Unmarshal(r.entity).to[String])
 }
-
 ```
 
 ## Connection types
