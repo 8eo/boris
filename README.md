@@ -1,11 +1,77 @@
 # Boris #
 
-Boris the Russian is can not be killed! The goal is to provide a robust, reactive and 
-failsafe ReST client for accessing multiple redundant servers providing an identical
-service. If a call to one of them fails, Boris will simply attempt the request on
-another server and fail only if all server options have been exhausted.
+Boris the Russian can not be killed! The goal is to provide a robust, reactive and 
+failsafe ReST client for accessing single or  multiple (redundant) servers providing a service.
+In the case of multiple identical servers, Boris will sent successive requests to the next server
+in it's list (Round Robin). Failed requests are simply repeated on the next server.
+It will only fail if all server options have been exhausted after several tries. 
+Individual servers that return repeated failures are removed from the pool for a set 
+period of time.
 
-## Contribution policy ##
+Boris is a thin layer over the awesome [Akka HTTP](http://doc.akka.io/docs/akka-http/current/scala.html)
+project so all response values are Akka streams.
+
+```scala
+libraryDependencies += "co.horn" %% "boris" % "0.0.3"
+```
+
+# Usage
+Using Boris is pretty straight forward:
+
+```scala
+
+
+object SnatchSomeService {
+
+  import co.horn.Boris._
+  
+  // List of identical redundant servers
+  val uri = Seq(Uri("https://server.one"), Uri("https://server.two"))
+  
+  // Create a client for a round robin pool of servers using a pooled connection
+  // to each server
+  val client = multiPoolClient(uri)
+  
+  // Perform the request on the next server in the list
+  client.exec(Get("/some/service")).map(r ⇒ Unmarshal(r.entity).to[String])
+
+}
+
+```
+
+## Connection types
+
+Boris can maintain three different connection types. These are:
+
+* Multi-server pooled connections: Boris maintains a pooled connection to each server in the pool
+(subject to Akka HTTP's pool settings) and issues requests to the servers in a Round Robin scheduler. 
+Failed requests are sent to the next server in the list. Repeated failures on a server result in that
+server being removed from the pool for a fixed period of time.
+* Single-server pooled connections: This is a wrapper over Akka HTTP's pooled connection to a single 
+server.
+* Single-server one connection per request: In cases where a pool is not practical, Boris can
+issue single http requests.
+
+Each of these connection types allows management of the entity returned by the request. Because
+the underlying transport is an Akka Stream and must be dealt with as such. Either the server 
+must send a `Connection: close` in the header or the caller needs to attach some Sink (e.g. 
+`Sink.ignore` or an `Unmarshal`) to consume the stream. Failure to do so will result in a leak
+of the stream which results in a visit to StackOverflow. Boris provides variants of the `exec` 
+method which either request the stream to fully consume the response entity (`execStrict`) or
+drop the entity (`execDrop`) if you have no interest in the entity.
+
+For pooled clients, Boris provides a range of strategies to deal with overflows on the request
+queues. These are the `OverflowStrategy` methods provided by Akka Streams
+
+* Drop head: Drop the oldest request in the queue and enqueue this request.
+* Drop tail: Drop the newest element and replace it with this request.
+* Drop buffer: Clear everything in the queue and submit this request.
+* Drop new: If the buffer is full, drop this request.
+* Backpressure: Apply backpressure upstream.
+* Fail: Complete the stream with a failure.
+
+
+# Contribution policy #
 
 Contributions via GitHub pull requests are gladly accepted from their original
 author. Along with any pull requests, please state that the contribution is your
@@ -15,6 +81,6 @@ copyrighted material via pull request, email, or other means you agree to
 license the material under the project's open source license and warrant that
 you have the legal authority to do so.
 
-## License ##
+# License #
 
 This code is open source software licensed under the [Apache 2.0 License]("http://www.apache.org/licenses/LICENSE-2.0.html").
