@@ -44,13 +44,9 @@ private[boris] class PooledSingleServerRequest(server: Uri,
 
   private val pool =
     if (server.scheme == "https") {
-      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](server.authority.host.address,
-                                                                  server.authority.port,
-                                                                  settings = poolSettings)
+      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](host(server), port(server), settings = poolSettings)
     } else {
-      Http().cachedHostConnectionPool[Promise[HttpResponse]](server.authority.host.address,
-                                                             server.authority.port,
-                                                             poolSettings)
+      Http().cachedHostConnectionPool[Promise[HttpResponse]](host(server), port(server), poolSettings)
     }
 
   private val dropQueue = queue(pool, drop, bufferSize, overflowStrategy, name)
