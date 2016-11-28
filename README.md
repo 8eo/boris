@@ -1,4 +1,5 @@
-![Build Status](https://travis-ci.org/8eo/boris.svg?branch=development)
+[![Build Status](https://travis-ci.org/8eo/boris.svg?branch=development)](https://travis-ci.org/8eo/boris)
+[<img src="https://img.shields.io/badge/horn-%3EBoris%E2%80%85the%E2%80%85Russian-green.svg">](https://horn.co/%3EBoris%E2%80%85the%E2%80%85Russian)
 
 # Boris #
 
