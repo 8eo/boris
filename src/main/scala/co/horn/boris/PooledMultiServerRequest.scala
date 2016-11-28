@@ -61,11 +61,9 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
   // A pool of Flows that will execute the HTTP requests via a connection pool
   private val queues = servers.map {
     case u if u.scheme == "https" ⇒
-      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](u.authority.host.address,
-                                                                  u.authority.port,
-                                                                  settings = poolSettings)
+      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](host(u), port(u), settings = poolSettings)
     case u ⇒
-      Http().cachedHostConnectionPool[Promise[HttpResponse]](u.authority.host.address, u.authority.port, poolSettings)
+      Http().cachedHostConnectionPool[Promise[HttpResponse]](host(u), port(u), poolSettings)
   }.map { pool ⇒
     Map(QueueTypes.drop → queue(pool, drop, bufferSize, overflowStrategy, name),
         QueueTypes.strict → queue(pool, strict(strictMaterializeTimeout), bufferSize, overflowStrategy, name),
