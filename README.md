@@ -2,7 +2,6 @@
 [<img src="https://img.shields.io/badge/horn-%3EBoris%E2%80%85the%E2%80%85Russian-green.svg">](https://horn.co/%3EBoris%E2%80%85the%E2%80%85Russian)
 
 # Boris #
-
 Boris the Russian can not be killed! The goal is to provide a robust, reactive and 
 failsafe ReST client for accessing single or  multiple (redundant) servers providing a service.
 In the case of multiple identical servers, Boris will sent successive requests to the next server
@@ -31,8 +30,7 @@ object SnatchSomeService {
   // List of identical redundant servers
   val uri = Seq(Uri("https://server.one"), Uri("https://server.two"))
   
-  // Create a client for a round robin pool of servers using a pooled connection
-  // to each server
+  // Create a client for a round robin pool of servers using a pooled connection to each server
   val client = RestClientFactory.multiPoolClient(uri)
   
   // Perform the request on the next server in the list
@@ -42,7 +40,6 @@ object SnatchSomeService {
 ```
 
 ## Connection types
-
 Boris can maintain three different connection types. These are:
 
 * Multi-server pooled connections: Boris maintains a pooled connection to each server in the pool
@@ -76,7 +73,7 @@ queues. These are the `OverflowStrategy` methods provided by Akka Streams
 
 The default configuration for Boris is given below. The configurations can be overridden
 in various ways using the methods in `RestClientFactory`. There are two separate configurations. 
-One specifies the connection pool configuration (`ConnectionPoolSettings`) and the other configures
+One specifies the connection pool configuration (Akka's `ConnectionPoolSettings`) and the other configures
 Boris (`BorisConfig`). The Boris configuration parameters are presented below.
 
 ```hocon

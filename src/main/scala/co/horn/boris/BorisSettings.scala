@@ -72,6 +72,12 @@ case class BorisSettings(name: String,
 }
 
 object BorisSettings {
+
+  /**
+    * Map settings from Hocon config to something Boris can eat
+    * @param config Typesafe Config object containing the boris settings
+    * @return
+    */
   def apply(config: Config): BorisSettings = {
     val name = config.getString("name")
     val requestTimeout = config.getDuration("request-timeout", TimeUnit.MILLISECONDS).millis
