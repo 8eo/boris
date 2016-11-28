@@ -33,8 +33,7 @@ object SnatchSomeService {
   val client = RestClientFactory.multiPoolClient(uri)
   
   // Perform the request on the next server in the list
-  client.exec(Get("/some/service")).map(r ⇒ Unmarshal(r.entity).to[String])
-
+  val res = client.exec(Get("/some/service")).map(r ⇒ Unmarshal(r.entity).to[String])
 }
 
 ```
