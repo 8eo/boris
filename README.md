@@ -12,7 +12,7 @@ Boris is a thin layer over the awesome [Akka HTTP](http://doc.akka.io/docs/akka-
 project so all response values are Akka streams.
 
 ```scala
-libraryDependencies += "co.horn" %% "boris" % "0.0.3"
+libraryDependencies += "co.horn" %% "boris" % "0.0.5"
 ```
 
 # Usage
@@ -23,14 +23,14 @@ Using Boris is pretty straight forward:
 
 object SnatchSomeService {
 
-  import co.horn.Boris._
+  import co.horn.Boris.RestClientFactory
   
   // List of identical redundant servers
   val uri = Seq(Uri("https://server.one"), Uri("https://server.two"))
   
   // Create a client for a round robin pool of servers using a pooled connection
   // to each server
-  val client = multiPoolClient(uri)
+  val client = RestClientFactory.multiPoolClient(uri)
   
   // Perform the request on the next server in the list
   client.exec(Get("/some/service")).map(r ⇒ Unmarshal(r.entity).to[String])
@@ -69,6 +69,28 @@ queues. These are the `OverflowStrategy` methods provided by Akka Streams
 * Drop new: If the buffer is full, drop this request.
 * Backpressure: Apply backpressure upstream.
 * Fail: Complete the stream with a failure.
+
+## Configuration ##
+
+The default configuration for Boris is given below. The configurations can be overridden
+in various ways using the methods in `RestClientFactory`.
+
+```hocon
+horn.boris {
+  name = "boris_rest_client"        // Sets the name of the Stream Source
+  bufferSize = 100                  // Default size of the http-client queue.
+  overflowStrategy = "dropNew"      // "dropHead", "dropTail", "dropBuffer", "dropNew", "backpressure" or  "fail"
+  request-timeout = 10s             // The stream will time out a request after this time
+  materialize-timeout = 8s          // Time out for waiting on the entity when using "strictExec()"
+
+  dead-server {                     // Dead server management
+    enabled = true                  // Enable removal of the dead server if it fails repeatedly
+    failure-threshold = 5           // The number of consecutive failures before the server is considered as failed
+    suspend-time = 30s              // Maintain the failed status for this interval before retrying the server
+    min-available-servers = 1       // If fewer than this number of servers is available, fail the request
+  }
+}
+```
 
 
 # Contribution policy #
