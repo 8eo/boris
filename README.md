@@ -1,21 +1,32 @@
 [![Build Status](https://travis-ci.org/8eo/boris.svg?branch=development)](https://travis-ci.org/8eo/boris)
-[<img src="https://img.shields.io/badge/horn-%3EBoris%E2%80%85the%E2%80%85Russian-green.svg">](https://horn.co/%3EBoris%E2%80%85the%E2%80%85Russian)
+[<img src="https://img.shields.io/badge/horn-%3EBoris%E2%80%85the%E2%80%85Blade-green.svg">](https://horn.co/%3EBoris%E2%80%85the%E2%80%85Blade)
 
 # Boris #
-Boris the Russian can not be killed! The goal is to provide a robust, reactive and 
-failsafe ReST client for accessing single or  multiple (redundant) servers providing a service.
-In the case of multiple identical servers, Boris will sent successive requests to the next server
-in it's list (Round Robin). Failed requests are simply repeated on the next server.
-It will only fail if all server options have been exhausted after several tries. 
+[Boris the Blade](https://en.wikipedia.org/wiki/Snatch_(film)) can not be killed! The goal is to 
+provide a robust, reactive and failsafe ReST client for accessing single or  multiple (redundant) 
+servers providing a service. In the case of multiple identical servers, Boris will sent successive 
+requests to the next server in it's list (Round Robin). Failed requests are simply repeated on the 
+next server. It will only fail if all server options have been exhausted after several tries. 
 Individual servers that return repeated failures are removed from the pool for a set 
-period of time.
+period of time. Boris is a thin layer over the awesome 
+[Akka HTTP](http://doc.akka.io/docs/akka-http/current/scala.html) project so all response values 
+are Akka streams.
 
-Boris is a thin layer over the awesome [Akka HTTP](http://doc.akka.io/docs/akka-http/current/scala.html)
-project so all response values are Akka streams.
+Clone this project and install Boris using
+```bash
+sbt publishLocal
+```
+For Scala 2.12, use 
+```bash
+sbt ++2.12.0 publishLocal
+```
 
+You can include it in your project by adding the following dependency:
 ```scala
 libraryDependencies += "co.horn" %% "boris" % "0.0.5"
 ```
+
+If there is sufficient interest from the community we will publish it on Maven Central/
 
 # Usage
 Using Boris is pretty straight forward:
