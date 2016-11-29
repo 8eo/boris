@@ -5,6 +5,7 @@ scalaVersion := "2.11.8"
 crossScalaVersions := Seq("2.11.8", "2.12.0")
 fork in Test := true
 scalafmtConfig := Some(file(".scalafmt.conf"))
+//coverallsEndPoint := Some("https://coveralls.io/github/8eo/boris")
 
 scalacOptions ++= Seq(
   "-unchecked",
