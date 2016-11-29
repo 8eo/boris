@@ -26,7 +26,7 @@ You can include it in your project by adding the following dependency:
 libraryDependencies += "co.horn" %% "boris" % "0.0.5"
 ```
 
-If there is sufficient interest from the community we will publish it on Maven Central/
+If there is sufficient interest from the community we will publish it on Maven Central.
 
 # Usage
 Using Boris is pretty straight forward:
