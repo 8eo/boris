@@ -4,11 +4,6 @@ import akka.http.scaladsl.model.Uri
 
 package object boris {
 
-  object QueueTypes extends Enumeration {
-    type QueueType = Value
-    val drop, strict, notConsumed = Value
-  }
-
   /**
     * Get address string from Uri
     *
