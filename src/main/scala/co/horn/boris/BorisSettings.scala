@@ -13,10 +13,10 @@ import scala.concurrent.duration._
   */
 object QueueOverflowStrategy {
   def apply(strategy: String): OverflowStrategy = strategy match {
+    case "dropNew" ⇒ OverflowStrategy.dropNew
     case "dropHead" ⇒ OverflowStrategy.dropHead
     case "dropTail" ⇒ OverflowStrategy.dropTail
     case "dropBuffer" ⇒ OverflowStrategy.dropBuffer
-    case "dropNew" ⇒ OverflowStrategy.dropNew
     case "backpressure" ⇒ OverflowStrategy.backpressure
     case "fail" ⇒ OverflowStrategy.fail
     case fallback ⇒ OverflowStrategy.dropNew

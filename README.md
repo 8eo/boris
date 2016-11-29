@@ -94,13 +94,6 @@ horn.boris {
   overflowStrategy = "dropNew"      // "dropHead", "dropTail", "dropBuffer", "dropNew", "backpressure" or  "fail"
   request-timeout = 10s             // The stream will time out a request after this time
   materialize-timeout = 8s          // Time out for waiting on the entity when using "strictExec()"
-
-  dead-server {                     // Dead server management
-    enabled = true                  // Enable removal of the dead server if it fails repeatedly
-    failure-threshold = 5           // The number of consecutive failures before the server is considered as failed
-    suspend-time = 30s              // Maintain the failed status for this interval before retrying the server
-    min-available-servers = 1       // If fewer than this number of servers is available, fail the request
-  }
 }
 ```
 
