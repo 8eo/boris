@@ -150,7 +150,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     }
 
     it("will fail with AllServerAreMarkedAsDead when strategy allow to dispose all servers") {
-      val dss = DeadServerStrategy(1, 5 seconds, 0)
+      val dss = DeadServerStrategy(1, 10 seconds, 0)
       val settings = BorisSettings(system).withDeadServerStrategy(dss).withRequestTimeout(0.5 second)
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), settings)
       val ret = uri.indices.map { _ ⇒
@@ -183,7 +183,7 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       Thread.sleep(3000)
 
       val ret2 = uri.indices.map { _ ⇒
-        pool.exec(Get("/slow/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
+        pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
 
       Future.sequence(ret2).futureValue
