@@ -7,10 +7,10 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.stream.ActorMaterializer
-
-import scala.concurrent.duration._
-import scala.concurrent.Future
 import co.horn.boris.utils.FutureUtils.FutureWithTimeout
+
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 /**
   * Just sends a simple HTTP request that creates a new connection for each request. Note that you configure
@@ -52,8 +52,11 @@ private[boris] class SingleServerRequest(server: Uri,
   /**
     * @inheritdoc
     */
-  override def execStrict(req: HttpRequest): Future[HttpResponse] =
-    Http().singleRequest(setReq(req)).flatMap(_.toStrict(strictMaterializeTimeout)).withTimeout(requestTimeout)
+  override def execStrict(req: HttpRequest, timeout: Option[FiniteDuration] = None): Future[HttpResponse] =
+    Http()
+      .singleRequest(setReq(req))
+      .flatMap(_.toStrict(timeout.getOrElse(strictMaterializeTimeout)))
+      .withTimeout(requestTimeout)
 
 }
 

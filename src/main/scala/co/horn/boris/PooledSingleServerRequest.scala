@@ -8,7 +8,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.QueueOfferResult.Enqueued
-import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 
 import scala.concurrent.duration._
@@ -49,11 +48,7 @@ private[boris] class PooledSingleServerRequest(server: Uri,
       Http().cachedHostConnectionPool[Promise[HttpResponse]](host(server), port(server), poolSettings)
     }
 
-  private val dropQueue = queue(pool, drop, bufferSize, overflowStrategy, name)
-
-  private val strictQueue = queue(pool, strict(strictMaterializeTimeout), bufferSize, overflowStrategy, name)
-
-  private val notConsumedQueue = queue(pool, notConsumed, bufferSize, overflowStrategy, name)
+  private val _queue = queue(pool, bufferSize, overflowStrategy, name)
 
   /**
     * Execute a single request using the connection pool. Callers ABSOLUTELY HAVE TO
@@ -62,7 +57,7 @@ private[boris] class PooledSingleServerRequest(server: Uri,
     * @param req An HttpRequest
     * @return The response
     */
-  def exec(req: HttpRequest): Future[HttpResponse] = execHelper(req, notConsumedQueue)
+  override def exec(req: HttpRequest): Future[HttpResponse] = execHelper(req)
 
   /**
     * Execute a single request using the connection pool but explicitly drop the response
@@ -71,7 +66,10 @@ private[boris] class PooledSingleServerRequest(server: Uri,
     * @param req An HttpRequest
     * @return The response
     */
-  def execDrop(req: HttpRequest): Future[HttpResponse] = execHelper(req, strictQueue)
+  override def execDrop(req: HttpRequest): Future[HttpResponse] = execHelper(req).map { resp ⇒
+    resp.discardEntityBytes()
+    resp
+  }
 
   /**
     * Execute a single request using the connection pool strictly consuming
@@ -80,14 +78,13 @@ private[boris] class PooledSingleServerRequest(server: Uri,
     * @param req An HttpRequest
     * @return The response
     */
-  def execStrict(req: HttpRequest): Future[HttpResponse] = execHelper(req, strictQueue)
+  override def execStrict(req: HttpRequest, timeout: Option[FiniteDuration] = None): Future[HttpResponse] =
+    execHelper(req).flatMap(_.toStrict(timeout.getOrElse(strictMaterializeTimeout)))
 
-  private def execHelper(
-      request: HttpRequest,
-      queue: SourceQueueWithComplete[(HttpRequest, Promise[HttpResponse])]): Future[HttpResponse] = {
+  private def execHelper(request: HttpRequest): Future[HttpResponse] = {
     import co.horn.boris.utils.FutureUtils.FutureWithTimeout
     val promise = Promise[HttpResponse]
-    queue
+    _queue
       .offer(request -> promise)
       .flatMap {
         case Enqueued ⇒ promise.future
@@ -120,11 +117,17 @@ private[boris] class PooledSingleServerRequest(server: Uri,
     */
   def exec(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Iterable[Future[HttpResponse]] = {
     val f = queueTypes match {
-      case QueueTypes.drop ⇒ dropQueue
-      case QueueTypes.strict ⇒ strictQueue
-      case QueueTypes.notConsumed ⇒ notConsumedQueue
+      case QueueTypes.drop ⇒
+        r: HttpRequest ⇒
+          execDrop(r)
+      case QueueTypes.strict ⇒
+        r: HttpRequest ⇒
+          execStrict(r)
+      case QueueTypes.notConsumed ⇒
+        r: HttpRequest ⇒
+          exec(r)
     }
-    requests.map(r ⇒ execHelper(r, f))
+    requests.map(f)
   }
 }
 

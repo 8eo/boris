@@ -6,6 +6,7 @@ package co.horn.boris
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
 /**
   * Interface into the ReST clients offered by Boris
@@ -41,7 +42,7 @@ trait RestRequests {
     * @param req An HttpRequest
     * @return The response
     */
-  def execStrict(req: HttpRequest): Future[HttpResponse]
+  def execStrict(req: HttpRequest, timeout: Option[FiniteDuration] = None): Future[HttpResponse]
 }
 
 /**
@@ -69,6 +70,5 @@ trait BatchRequests {
     * @param requests A list of requests that should be simultaneously issued to the pool
     * @return The Future responses in the same order as they were submitted
     */
-
   def exec(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Iterable[Future[HttpResponse]]
 }

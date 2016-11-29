@@ -10,7 +10,6 @@ import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{ActorMaterializer, OverflowStrategy}
-import co.horn.boris.QueueTypes.QueueType
 import co.horn.boris.utils.Ref
 
 import scala.annotation.tailrec
@@ -65,9 +64,7 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
     case u ⇒
       Http().cachedHostConnectionPool[Promise[HttpResponse]](host(u), port(u), poolSettings)
   }.map { pool ⇒
-    Map(QueueTypes.drop → queue(pool, drop, bufferSize, overflowStrategy, name),
-        QueueTypes.strict → queue(pool, strict(strictMaterializeTimeout), bufferSize, overflowStrategy, name),
-        QueueTypes.notConsumed → queue(pool, notConsumed, bufferSize, overflowStrategy, name))
+    queue(pool, bufferSize, overflowStrategy, name)
   }
 
   private val poolIndex: AtomicInteger = new AtomicInteger()
@@ -80,8 +77,7 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
     *
     * @return A tuple (pool index, pool)
     */
-  private def nextFlow(
-      queue: QueueType): Option[(Int, SourceQueueWithComplete[(HttpRequest, Promise[HttpResponse])])] = {
+  private def nextFlow: Option[(Int, SourceQueueWithComplete[(HttpRequest, Promise[HttpResponse])])] = {
     val NO_AVAILABLE_SERVERS = -1
     val n = poolIndex.getAndUpdate(new IntUnaryOperator {
       override def applyAsInt(operand: Int): Int = {
@@ -97,7 +93,7 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
         _pickServer((operand + 1) % poolSize, availableServers())
       }
     })
-    if (n >= 0) Some(n → queues(n)(queue)) else None
+    if (n >= 0) Some(n → queues(n)) else None
   }
 
   /**
@@ -133,21 +129,25 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
   /**
     * @inheritdoc
     */
-  override def exec(req: HttpRequest): Future[HttpResponse] = execHelper(req, QueueTypes.notConsumed)
+  override def exec(req: HttpRequest): Future[HttpResponse] = execHelper(req)
 
   /**
     * @inheritdoc
     */
-  override def execDrop(req: HttpRequest): Future[HttpResponse] = execHelper(req, QueueTypes.drop)
+  override def execDrop(req: HttpRequest): Future[HttpResponse] = execHelper(req).map { resp ⇒
+    resp.discardEntityBytes()
+    resp
+  }
 
   /**
     * @inheritdoc
     */
-  override def execStrict(req: HttpRequest): Future[HttpResponse] = execHelper(req, QueueTypes.strict)
+  override def execStrict(req: HttpRequest, timeout: Option[FiniteDuration] = None): Future[HttpResponse] =
+    execHelper(req).flatMap(_.toStrict(timeout.getOrElse(strictMaterializeTimeout)))
 
-  private def execHelper(request: HttpRequest, queueType: QueueType, tries: Int = 0): Future[HttpResponse] = {
+  private def execHelper(request: HttpRequest, tries: Int = 0): Future[HttpResponse] = {
     import co.horn.boris.utils.FutureUtils.FutureWithTimeout
-    nextFlow(queueType) match {
+    nextFlow match {
       case None ⇒ Future.failed(NoServersResponded(AllServerAreMarkedAsDead))
       case Some((idx, flow)) ⇒
         val promise = Promise[HttpResponse]
@@ -166,7 +166,7 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
             case t: Throwable if tries < poolSize ⇒
               serverFailure(idx)
               system.log.warning(s"Request to ${request.uri} failed on ${servers(idx)}: Failure was ${t.getMessage}")
-              execHelper(request, queueType, tries + 1)
+              execHelper(request, tries + 1)
             case t: Throwable if tries >= poolSize ⇒
               serverFailure(idx)
               system.log.error(
