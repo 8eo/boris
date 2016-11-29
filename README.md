@@ -24,7 +24,7 @@ sbt ++2.12.0 publishLocal
 
 You can include it in your project by adding the following dependency:
 ```scala
-libraryDependencies += "co.horn" %% "boris" % "0.0.5"
+libraryDependencies += "co.horn" %% "boris" % "0.0.6"
 ```
 
 If there is sufficient interest from the community we will publish it on Maven Central.
