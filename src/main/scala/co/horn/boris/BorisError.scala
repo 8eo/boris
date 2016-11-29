@@ -8,10 +8,6 @@ import akka.stream.QueueOfferResult
 trait BorisError extends Throwable
 
 /**
-  * All servers failed and are marked as dead now.
-  */
-case object AllServerAreMarkedAsDead extends BorisError
-/**
   * None of the available servers was able to return proper response.
   * @param cause What caused the the failure.
   */

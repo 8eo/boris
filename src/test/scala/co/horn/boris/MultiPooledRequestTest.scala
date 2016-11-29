@@ -18,16 +18,15 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Milliseconds, Seconds, Span}
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, TimeoutException}
+import scala.concurrent._
 import scala.util.Try
 
-class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
+class MultiPooledRequestTest extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
 
   implicit val system = ActorSystem("Test")
   implicit val materializer = ActorMaterializer()
-  implicit val patience = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
+  implicit val patience = PatienceConfig(timeout = Span(1000, Seconds), interval = Span(100, Milliseconds))
   private val systemConfig = system.settings.config.getConfig("horn.boris")
 
   // Very simple routing that just returns the current server instance
@@ -62,28 +61,28 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     Future.sequence(servers.map(_.unbind)).futureValue
   }
 
-  describe("The round robin scheduler") {
+  describe("The multi pool scheduler") {
 
     it("cannot have empty uri list") {
       val pool = Try(PooledMultiServerRequest(Seq.empty, ConnectionPoolSettings(system), BorisSettings(system)))
       pool.failed.get shouldBe an[IllegalArgumentException]
     }
 
-    it("visits the servers in turn") {
+    it("is using all available connections") {
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
-        pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
+        pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
-      (0 until 5).foreach(i ⇒ ret.count(_ == i.toString) shouldBe 4)
+      Future.sequence(ret).futureValue.toSet should contain only ("0", "1", "2", "3", "4")
     }
 
     it("catches a failed server") {
       servers(1).unbind.futureValue // This is not reliably shutting down this server
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
-        pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
+        pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
-      ret.toSet should contain only ("0", "2", "3", "4")
+      Future.sequence(ret).futureValue.toSet should contain only ("0", "2", "3", "4")
     }
 
     it("fails if no servers are able to serve the request") {
@@ -103,30 +102,35 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
 
     it("handles servers that time out") {
       val config = ConfigFactory.parseString("""
-            |  request-timeout = 0.5s
-            |  materialize-timeout = 0.4s
-          """.stripMargin).withFallback(systemConfig)
+          |  request-timeout = 0.5s
+          |  materialize-timeout = 0.4s
+        """.stripMargin).withFallback(systemConfig)
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(config))
       val ret = (0 until 20).map { _ ⇒
-        pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
+        pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
-      ret.toSet should contain only ("0", "2", "3", "4") // Server "1" is slow
+
+      val result = Future.sequence(ret).futureValue
+      result.size should be(20)
+      result.toSet should contain only ("0", "2", "3", "4") // Server "1" is slow
     }
 
     it("works with strict entity mode") {
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
-        pool.execStrict(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
+        pool.execStrict(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
-      (0 until 5).foreach(i ⇒ ret.count(_ == i.toString) shouldBe 4)
+      val result = Future.sequence(ret).futureValue
+      (0 until 5).foreach(i ⇒ result.count(_ == i.toString) shouldBe 4)
     }
 
     it("works with strict drop mode") {
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(system))
       val ret = (0 until 20).map { _ ⇒
-        pool.execDrop(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
+        pool.execDrop(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
-      (0 until 5).foreach(i ⇒ ret.count(_ == i.toString) shouldBe 4)
+      val result = Future.sequence(ret).futureValue
+      (0 until 5).foreach(i ⇒ result.count(_ == i.toString) shouldBe 4)
     }
   }
 
@@ -148,46 +152,5 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
       }
       Future.sequence(ret).futureValue
     }
-
-    it("will fail with AllServerAreMarkedAsDead when strategy allow to dispose all servers") {
-      val dss = DeadServerStrategy(1, 10 seconds, 0)
-      val settings = BorisSettings(system).withDeadServerStrategy(dss).withRequestTimeout(0.5 second)
-      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), settings)
-      val ret = uri.indices.map { _ ⇒
-        pool.exec(Get("/slow/very")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
-      }
-      Future.sequence(ret).failed.futureValue.asInstanceOf[NoServersResponded].cause should be(
-        AllServerAreMarkedAsDead)
-    }
-
-    it("will not dispose all servers when strategy doesn't allow to") {
-      val dss = DeadServerStrategy(1, 5 seconds, 1)
-      val settings = BorisSettings(system).withDeadServerStrategy(dss).withRequestTimeout(0.5 second)
-      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), settings)
-      val ret = uri.indices.map { _ ⇒
-        pool.exec(Get("/slow/very")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
-      }
-      Future.sequence(ret).failed.futureValue.asInstanceOf[NoServersResponded].cause shouldBe a[TimeoutException]
-    }
-
-    it("will clear server status when suspendTime pass") {
-      val dss = DeadServerStrategy(1, 3 seconds, 0)
-      val settings = BorisSettings(system).withDeadServerStrategy(dss).withRequestTimeout(0.2 second)
-      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), settings)
-      val ret = uri.indices.map { _ ⇒
-        pool.exec(Get("/slow/very")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
-      }
-      Future.sequence(ret).failed.futureValue.asInstanceOf[NoServersResponded].cause should be(
-        AllServerAreMarkedAsDead)
-
-      Thread.sleep(3000)
-
-      val ret2 = uri.indices.map { _ ⇒
-        pool.exec(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
-      }
-
-      Future.sequence(ret2).futureValue
-    }
-
   }
 }

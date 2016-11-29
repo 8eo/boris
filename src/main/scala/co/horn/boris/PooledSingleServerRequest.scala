@@ -8,10 +8,12 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.QueueOfferResult.Enqueued
+import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
+import scala.util.{Failure, Success}
 
 /**
   * Rest client dispatcher using an Akka http pooled connection to make the requests
@@ -48,7 +50,15 @@ private[boris] class PooledSingleServerRequest(server: Uri,
       Http().cachedHostConnectionPool[Promise[HttpResponse]](host(server), port(server), poolSettings)
     }
 
-  private val _queue = queue(pool, bufferSize, overflowStrategy, name)
+  private val queue = Source
+    .queue[(HttpRequest, Promise[HttpResponse])](bufferSize, overflowStrategy)
+    .named(name)
+    .via(pool)
+    .toMat(Sink.foreach {
+      case ((Success(resp), p)) => p.success(resp)
+      case ((Failure(e), p)) => p.failure(e)
+    })(Keep.left)
+    .run
 
   /**
     * Execute a single request using the connection pool. Callers ABSOLUTELY HAVE TO
@@ -84,7 +94,7 @@ private[boris] class PooledSingleServerRequest(server: Uri,
   private def execHelper(request: HttpRequest): Future[HttpResponse] = {
     import co.horn.boris.utils.FutureUtils.FutureWithTimeout
     val promise = Promise[HttpResponse]
-    _queue
+    queue
       .offer(request -> promise)
       .flatMap {
         case Enqueued ⇒ promise.future
