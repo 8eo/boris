@@ -17,7 +17,7 @@ object RestClientFactory {
     */
   def poolClient(server: Uri, connectionPoolSettings: ConnectionPoolSettings, settings: BorisSettings)(
       implicit system: ActorSystem,
-      materializer: ActorMaterializer): RestRequests with BatchRequests =
+      materializer: ActorMaterializer): RestRequests =
     PooledSingleServerRequest(server, connectionPoolSettings, settings)
 
   /**

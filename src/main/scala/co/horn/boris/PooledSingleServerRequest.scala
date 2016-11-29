@@ -11,8 +11,10 @@ import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 
+import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
+import scala.collection.immutable.Iterable
 import scala.util.{Failure, Success}
 
 /**
@@ -38,8 +40,7 @@ private[boris] class PooledSingleServerRequest(server: Uri,
                                                overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew)(
     implicit val system: ActorSystem,
     implicit val materializer: ActorMaterializer)
-    extends RestRequests
-    with BatchRequests {
+    extends RestRequests {
 
   import system.dispatcher
 
@@ -101,43 +102,6 @@ private[boris] class PooledSingleServerRequest(server: Uri,
         case other ⇒ Future.failed(EnqueueRequestFails(other))
       }
       .withTimeout(requestTimeout)
-  }
-
-  /**
-    * Take some sequence of requests and pipeline them through the connection pool.
-    * Return whatever responses we get as a flattened sequence with the answers in the same
-    * order as the original sequence. Zipping the request and response lists will result
-    * in tuples of corresponding requests and responses
-    *
-    * @param requests A list of requests that should be simultaneously issued to the pool
-    * @return The responses in the same order as they were submitted
-    */
-  def execFlatten(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Future[Iterable[HttpResponse]] = {
-    Future.sequence(exec(requests, queueTypes))
-  }
-
-  /**
-    * Take some sequence of requests and pipeline them through the connection pool.
-    * Return whatever responses we get as a sequence of futures that will be ordered
-    * in such a way that zipping the request and response lists will result
-    * in tuples of corresponding requests and responses.
-    *
-    * @param requests A list of requests that should be simultaneously issued to the pool
-    * @return The Future responses in the same order as they were submitted
-    */
-  def exec(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Iterable[Future[HttpResponse]] = {
-    val f = queueTypes match {
-      case QueueTypes.drop ⇒
-        r: HttpRequest ⇒
-          execDrop(r)
-      case QueueTypes.strict ⇒
-        r: HttpRequest ⇒
-          execStrict(r)
-      case QueueTypes.notConsumed ⇒
-        r: HttpRequest ⇒
-          exec(r)
-    }
-    requests.map(f)
   }
 }
 

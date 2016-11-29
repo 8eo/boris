@@ -44,31 +44,3 @@ trait RestRequests {
     */
   def execStrict(req: HttpRequest, timeout: Option[FiniteDuration] = None): Future[HttpResponse]
 }
-
-/**
-  * Use batched requests to the selected client
-  */
-trait BatchRequests {
-
-  /**
-    * Take some sequence of requests and pipeline them through the connection pool.
-    * Return whatever responses we get as a flattened sequence with the answers in the same
-    * order as the original sequence. Zipping the request and response lists will result
-    * in tuples of corresponding requests and responses. You must consume the responses.
-    *
-    * @param requests A list of requests that should be simultaneously issued to the pool
-    * @return The responses in the same order as they were submitted
-    */
-  def execFlatten(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Future[Iterable[HttpResponse]]
-
-  /**
-    * Take some sequence of requests and pipeline them through the connection pool.
-    * Return whatever responses we get as a sequence of futures that will be ordered
-    * in such a way that zipping the request and response lists will result
-    * in tuples of corresponding requests and responses. You must consume the responses
-    *
-    * @param requests A list of requests that should be simultaneously issued to the pool
-    * @return The Future responses in the same order as they were submitted
-    */
-  def exec(requests: Iterable[HttpRequest], queueTypes: QueueTypes.QueueType): Iterable[Future[HttpResponse]]
-}
