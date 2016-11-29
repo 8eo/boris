@@ -171,8 +171,8 @@ class RoundRobinTest extends FunSpec with BeforeAndAfterEach with ScalaFutures w
     }
 
     it("will clear server status when suspendTime pass") {
-      val dss = DeadServerStrategy(1, 2 seconds, 0)
-      val settings = BorisSettings(system).withDeadServerStrategy(dss).withRequestTimeout(0.5 second)
+      val dss = DeadServerStrategy(1, 3 seconds, 0)
+      val settings = BorisSettings(system).withDeadServerStrategy(dss).withRequestTimeout(0.2 second)
       val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), settings)
       val ret = uri.indices.map { _ ⇒
         pool.exec(Get("/slow/very")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
