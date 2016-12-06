@@ -19,7 +19,7 @@ sbt publishLocal
 ```
 For Scala 2.12, use 
 ```bash
-sbt ++2.12.0 publishLocal
+sbt ++2.12.1 publishLocal
 ```
 
 You can include it in your project by adding the following dependency:
