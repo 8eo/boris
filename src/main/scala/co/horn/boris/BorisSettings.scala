@@ -19,7 +19,7 @@ object QueueOverflowStrategy {
     case "dropBuffer" ⇒ OverflowStrategy.dropBuffer
     case "backpressure" ⇒ OverflowStrategy.backpressure
     case "fail" ⇒ OverflowStrategy.fail
-    case fallback ⇒ OverflowStrategy.dropNew
+    case _ ⇒ OverflowStrategy.dropNew
   }
 }
 
@@ -27,8 +27,9 @@ object QueueOverflowStrategy {
   * @param name                     The name for http flow
   * @param requestTimeout           Maximum duration before a request is considered timed out.
   * @param strictMaterializeTimeout Maximum duration for materialize the response entity when using strict method.
-  * @param bufferSize               Maximum size for backpressure queue. If all connection ale in use, the request will wait there to be executed.
-  *                                 should be bigger than akka.http.client.host-connection-pool.max-open-requests(default 32)
+  * @param bufferSize               Maximum size for backpressure queue. If all connection ale in use, the request
+  *                                 will wait there to be executed. The queue size should be bigger
+  *                                 than akka.http.client.host-connection-pool.max-open-requests(default 32)
   * @param overflowStrategy         Queue backpressure strategy, What to do when the queue is full(default drop new request)
   */
 @throws(classOf[IllegalArgumentException])

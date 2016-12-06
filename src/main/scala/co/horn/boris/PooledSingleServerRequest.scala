@@ -11,10 +11,8 @@ import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 
-import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
-import scala.collection.immutable.Iterable
 import scala.util.{Failure, Success}
 
 /**

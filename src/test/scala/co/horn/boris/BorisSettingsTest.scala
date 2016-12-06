@@ -4,13 +4,15 @@
 package co.horn.boris
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.Uri
 import akka.stream.{ActorMaterializer, OverflowStrategy}
+import co.horn.boris
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Milliseconds, Seconds, Span}
 import org.scalatest.{FunSpec, Matchers}
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import scala.util.Try
 
 class BorisSettingsTest extends FunSpec with ScalaFutures with Matchers {
@@ -18,7 +20,7 @@ class BorisSettingsTest extends FunSpec with ScalaFutures with Matchers {
   implicit val system = ActorSystem("Test")
   implicit val materializer = ActorMaterializer()
   implicit val patience = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
-  val systemConfig = system.settings.config.getConfig("horn.boris")
+  private val systemConfig = system.settings.config.getConfig("horn.boris")
 
   describe("BorisSettings") {
     describe("have some requirements for initial parameters.") {
@@ -79,6 +81,12 @@ class BorisSettingsTest extends FunSpec with ScalaFutures with Matchers {
       QueueOverflowStrategy("backpressure") should be(OverflowStrategy.backpressure)
       QueueOverflowStrategy("fail") should be(OverflowStrategy.fail)
       QueueOverflowStrategy("wrong") should be(OverflowStrategy.dropNew)
+    }
+
+    it("corretly handles default ports in URIs") {
+      boris.port(Uri("http://a.b")) shouldBe 80
+      boris.port(Uri("https://a.b")) shouldBe 443
+      boris.port(Uri("http://a.b:123")) shouldBe 123
     }
   }
 }
