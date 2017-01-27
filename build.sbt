@@ -1,7 +1,7 @@
 name := "boris"
 organization := "co.horn"
 version := "0.0.7"
-scalaVersion := "2.11.8"
+scalaVersion := "2.12.1"
 crossScalaVersions := Seq("2.11.8", "2.12.1")
 fork in Test := true
 scalafmtConfig := Some(file(".scalafmt.conf"))
