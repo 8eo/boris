@@ -1,6 +1,6 @@
 name := "boris"
 organization := "co.horn"
-version := "0.0.6"
+version := "0.0.7"
 scalaVersion := "2.11.8"
 crossScalaVersions := Seq("2.11.8", "2.12.1")
 fork in Test := true
@@ -16,7 +16,7 @@ scalacOptions ++= Seq(
   "-language:postfixOps")
 
 libraryDependencies ++= {
-  val akkaHttpV    = "10.0.0"
+  val akkaHttpV    = "10.0.3"
   val scalaTestV   = "3.0.1"
   Seq(
     "com.typesafe.akka"   %% "akka-http"             % akkaHttpV,
