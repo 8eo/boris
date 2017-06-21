@@ -2,6 +2,7 @@ name := "boris"
 organization := "co.horn"
 version := "0.0.9"
 scalaVersion := "2.12.2"
+crossScalaVersions := Seq("2.11.8", "2.12.1")
 fork in Test := true
 
 scalacOptions ++= Seq("-unchecked",
