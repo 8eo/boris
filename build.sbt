@@ -1,6 +1,6 @@
 name := "boris"
 organization := "co.horn"
-version := "0.0.9"
+version := "0.0.10"
 scalaVersion := "2.12.3"
 fork in Test := true
 
