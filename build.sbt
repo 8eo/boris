@@ -1,9 +1,9 @@
 name := "boris"
 organization := "co.horn"
 version := "0.0.9"
-scalaVersion := "2.12.2"
-crossScalaVersions := Seq("2.11.8", "2.12.1")
+scalaVersion := "2.12.3"
 fork in Test := true
+scalafmtConfig := Some(file(".scalafmt.conf"))
 
 scalacOptions ++= Seq("-unchecked",
                       "-deprecation",
@@ -15,9 +15,9 @@ scalacOptions ++= Seq("-unchecked",
                       "-language:postfixOps")
 
 libraryDependencies ++= {
-  val akkaHttpV = "10.0.6"
-  val akkaV = "2.5.1" // Needed to force Akka HTTP 10.0.6 to use Current Akka version
-  val scalaTestV = "3.0.1"
+  val akkaHttpV    = "10.0.9"
+  val akkaV        = "2.5.3" // Needed to force Akka HTTP 10.0.6 to use Current Akka version
+  val scalaTestV   = "3.0.1"
   Seq(
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
