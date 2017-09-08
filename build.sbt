@@ -1,6 +1,6 @@
 name := "boris"
 organization := "co.horn"
-version := "0.0.10"
+version := "0.0.11"
 scalaVersion := "2.12.3"
 fork in Test := true
 
@@ -14,8 +14,8 @@ scalacOptions ++= Seq("-unchecked",
                       "-language:postfixOps")
 
 libraryDependencies ++= {
-  val akkaHttpV    = "10.0.9"
-  val akkaV        = "2.5.3" // Needed to force Akka HTTP 10.0.6 to use Current Akka version
+  val akkaHttpV    = "10.0.10"
+  val akkaV        = "2.5.4" // Needed to force Akka HTTP 10.0.6 to use Current Akka version
   val scalaTestV   = "3.0.1"
   Seq(
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
