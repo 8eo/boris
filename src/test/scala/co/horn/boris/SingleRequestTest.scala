@@ -3,6 +3,8 @@
  */
 package co.horn.boris
 
+import java.util.concurrent.TimeoutException
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -16,13 +18,14 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Milliseconds, Seconds, Span}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.Unmarshal
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class SingleRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
 
-  implicit val system = ActorSystem("Test")
-  implicit val materializer = ActorMaterializer()
-  implicit val patience = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
+  implicit val system: ActorSystem = ActorSystem("Test")
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val patience: PatienceConfig = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
 
   // Very simple routing that just returns the current server instance
   def route(instance: Int): Route = get {
@@ -35,6 +38,10 @@ class SingleRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
       } ~
       path("slow" / "abit") {
         Thread.sleep(50)
+        complete(StatusCodes.OK, instance.toString)
+      } ~
+      path("painfully_slow") {
+        Thread.sleep(10000)
         complete(StatusCodes.OK, instance.toString)
       }
   }
@@ -75,6 +82,13 @@ class SingleRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
         pool.execDrop(Get("/bumble")).flatMap(f ⇒ Unmarshal(f.entity).to[String]).futureValue
       }
       ret shouldBe List.fill(20)("1234") // Responses arrive anyway because they are so small
+    }
+
+    it("handles calls that time out on the server") {
+      val pool = SingleServerRequest(uri, BorisSettings(system))
+      pool.execDrop(Get("/painfully_slow")).failed.futureValue shouldBe a[TimeoutException]
+      pool.execDrop(Get("/painfully_slow")).failed.futureValue shouldBe a[TimeoutException]
+      pool.exec(Get("/painfully_slow")).failed.futureValue shouldBe a[TimeoutException]
     }
   }
 }
