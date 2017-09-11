@@ -25,7 +25,8 @@ class SingleRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
 
   implicit val system: ActorSystem = ActorSystem("Test")
   implicit val materializer: ActorMaterializer = ActorMaterializer()
-  implicit val patience: PatienceConfig = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
+  implicit val patience: PatienceConfig =
+    PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
 
   // Very simple routing that just returns the current server instance
   def route(instance: Int): Route = get {
@@ -89,6 +90,13 @@ class SingleRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutu
       pool.execDrop(Get("/painfully_slow")).failed.futureValue shouldBe a[TimeoutException]
       pool.execDrop(Get("/painfully_slow")).failed.futureValue shouldBe a[TimeoutException]
       pool.exec(Get("/painfully_slow")).failed.futureValue shouldBe a[TimeoutException]
+    }
+
+    it("survives the server being killed") {
+      val pool = SingleServerRequest(uri, BorisSettings(system))
+      val req = pool.execDrop(Get("/painfully_slow"))
+      server.unbind.futureValue
+      req.failed.futureValue shouldBe a[TimeoutException]
     }
   }
 }

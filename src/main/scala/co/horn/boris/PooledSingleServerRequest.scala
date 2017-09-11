@@ -55,7 +55,7 @@ private[boris] class PooledSingleServerRequest(server: Uri,
     .via(pool)
     .toMat(Sink.foreach {
       case ((Success(resp), p)) => p.success(resp)
-      case ((Failure(e), p)) => p.failure(e)
+      case ((Failure(e), p))    => p.failure(e)
     })(Keep.left)
     .run
 

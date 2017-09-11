@@ -57,7 +57,7 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
     .via(StreamUtils.balancer(pools))
     .toMat(Sink.foreach {
       case ((Success(resp), p)) => p.success(resp)
-      case ((Failure(e), p)) => p.failure(e)
+      case ((Failure(e), p))    => p.failure(e)
     })(Keep.left)
     .run
 
