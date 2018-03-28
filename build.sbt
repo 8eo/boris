@@ -2,6 +2,8 @@ name := "boris"
 organization := "co.horn"
 version := "0.0.16"
 scalaVersion := "2.12.5"
+//Do not remove it it's used in lambda package and it's still 2.11
+//because of https://github.com/datastax/spark-cassandra-connector
 +crossScalaVersions := Seq("2.11.8", "2.12.5")
 fork in Test := true
 
