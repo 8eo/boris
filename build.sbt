@@ -1,10 +1,10 @@
 name := "boris"
 organization := "co.horn"
-version := "0.0.16"
-scalaVersion := "2.12.5"
+version := "0.0.17"
+scalaVersion := "2.12.6"
 //Do not remove it it's used in lambda package and it's still 2.11
 //because of https://github.com/datastax/spark-cassandra-connector
-crossScalaVersions := Seq("2.11.8", "2.12.5")
+crossScalaVersions := Seq("2.11.8", "2.12.6")
 fork in Test := true
 
 scalacOptions ++= Seq("-unchecked",
@@ -17,8 +17,8 @@ scalacOptions ++= Seq("-unchecked",
                       "-language:postfixOps")
 
 libraryDependencies ++= {
-  val akkaHttpV = "10.1.0"
-  val akkaV = "2.5.11"
+  val akkaHttpV = "10.1.3"
+  val akkaV = "2.5.13"
   val scalaTestV = "3.0.5"
   Seq(
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
