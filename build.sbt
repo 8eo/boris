@@ -17,6 +17,10 @@ scalacOptions ++= Seq("-unchecked",
                       "-feature",
                       "-language:postfixOps")
 
+// Sbt seems to have some issues with publishing packages with credentials and below line is an workaround
+// for this bug: https://github.com/sbt/sbt/issues/3570
+updateOptions := updateOptions.value.withGigahorse(false)
+
 publishTo := Some("Horn SBT" at "https://sbt.horn.co/repository/internal")
 credentials += Credentials(
   "Repository Archiva Managed internal Repository",
