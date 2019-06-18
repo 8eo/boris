@@ -13,15 +13,6 @@ period of time. Boris is a thin layer over the awesome
 [Akka HTTP](http://doc.akka.io/docs/akka-http/current/scala.html) project so all response values 
 are Akka streams.
 
-Clone this project and install Boris using
-```bash
-sbt publishLocal
-```
-For Scala 2.12, use 
-```bash
-sbt ++2.12.1 publishLocal
-```
-
 You can include it in your project by adding the following dependency:
 ```scala
 libraryDependencies += "co.horn" %% "boris" % "0.0.6"
