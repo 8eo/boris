@@ -1,6 +1,7 @@
+
 name := "boris"
 organization := "co.horn"
-version := "0.0.17"
+version := "0.0.18"
 scalaVersion := "2.12.6"
 //Do not remove it it's used in lambda package and it's still 2.11
 //because of https://github.com/datastax/spark-cassandra-connector
@@ -15,6 +16,14 @@ scalacOptions ++= Seq("-unchecked",
                       "-target:jvm-1.8",
                       "-feature",
                       "-language:postfixOps")
+
+publishTo := Some("Horn SBT" at "https://sbt.horn.co/repository/internal")
+credentials += Credentials(
+  "Repository Archiva Managed internal Repository",
+  "sbt.horn.co",
+  sys.env("HORN_SBT_USERNAME"),
+  sys.env("HORN_SBT_PASSWORD")
+)
 
 libraryDependencies ++= {
   val akkaHttpV = "10.1.3"
