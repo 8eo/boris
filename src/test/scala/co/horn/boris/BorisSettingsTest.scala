@@ -5,7 +5,7 @@ package co.horn.boris
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.Uri
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.OverflowStrategy
 import co.horn.boris
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.ScalaFutures
@@ -17,16 +17,16 @@ import scala.util.Try
 
 class BorisSettingsTest extends FunSpec with ScalaFutures with Matchers {
 
-  implicit val system = ActorSystem("Test")
-  implicit val materializer = ActorMaterializer()
-  implicit val patience = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
-  private val systemConfig = system.settings.config.getConfig("horn.boris")
+  implicit val system       = ActorSystem("Test")
+  implicit val materializer = Materializer()
+  implicit val patience     = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
+  private val systemConfig  = system.settings.config.getConfig("horn.boris")
 
   describe("BorisSettings") {
     describe("have some requirements for initial parameters.") {
 
       it("timeouts must be greater than zero.") {
-        var config = ConfigFactory.parseString("request-timeout = 0s").withFallback(systemConfig)
+        var config   = ConfigFactory.parseString("request-timeout = 0s").withFallback(systemConfig)
         var settings = Try(BorisSettings(config))
         settings.failed.get shouldBe an[IllegalArgumentException]
 
@@ -36,7 +36,7 @@ class BorisSettingsTest extends FunSpec with ScalaFutures with Matchers {
       }
 
       it("queue bufferSize must be greater than zero") {
-        val config = ConfigFactory.parseString("bufferSize = 0").withFallback(systemConfig)
+        val config   = ConfigFactory.parseString("bufferSize = 0").withFallback(systemConfig)
         val settings = Try(BorisSettings(config))
         settings.failed.get shouldBe an[IllegalArgumentException]
       }

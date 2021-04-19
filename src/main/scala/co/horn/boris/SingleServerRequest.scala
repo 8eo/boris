@@ -6,7 +6,7 @@ package co.horn.boris
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import co.horn.boris.utils.FutureUtils.FutureWithTimeout
 
 import scala.concurrent.Future
@@ -20,11 +20,11 @@ import scala.concurrent.duration._
   *
   * @param server A URI pointing to the server
   */
-private[boris] class SingleServerRequest(server: Uri,
-                                         requestTimeout: FiniteDuration,
-                                         strictMaterializeTimeout: FiniteDuration)(
-    implicit val system: ActorSystem,
-    implicit val materializer: ActorMaterializer)
+private[boris] class SingleServerRequest(
+    server: Uri,
+    requestTimeout: FiniteDuration,
+    strictMaterializeTimeout: FiniteDuration
+)(implicit val system: ActorSystem, implicit val materializer: Materializer)
     extends RestRequests {
 
   import system.dispatcher
@@ -69,8 +69,10 @@ object SingleServerRequest {
     * @param settings Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
     * @return PooledMultiServerRequest rest client
     */
-  def apply(server: Uri, settings: BorisSettings)(implicit system: ActorSystem,
-                                                  materializer: ActorMaterializer): SingleServerRequest = {
+  def apply(server: Uri, settings: BorisSettings)(implicit
+      system: ActorSystem,
+      materializer: Materializer
+  ): SingleServerRequest = {
     new SingleServerRequest(server, settings.requestTimeout, settings.strictMaterializeTimeout)
   }
 }

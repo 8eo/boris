@@ -3,7 +3,7 @@ package co.horn.boris
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.settings.ConnectionPoolSettings
-import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 
 object RestClientFactory {
 
@@ -15,9 +15,10 @@ object RestClientFactory {
     * @param settings               Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
     * @return                       A client against which requests can be made
     */
-  def poolClient(server: Uri, connectionPoolSettings: ConnectionPoolSettings, settings: BorisSettings)(
-      implicit system: ActorSystem,
-      materializer: ActorMaterializer): RestRequests =
+  def poolClient(server: Uri, connectionPoolSettings: ConnectionPoolSettings, settings: BorisSettings)(implicit
+      system: ActorSystem,
+      materializer: Materializer
+  ): RestRequests =
     PooledSingleServerRequest(server, connectionPoolSettings, settings)
 
   /**
@@ -26,7 +27,7 @@ object RestClientFactory {
     * @param server The server uri
     * @return                       A client against which requests can be made
     */
-  def poolClient(server: Uri)(implicit system: ActorSystem, materializer: ActorMaterializer): RestRequests =
+  def poolClient(server: Uri)(implicit system: ActorSystem, materializer: Materializer): RestRequests =
     poolClient(server, ConnectionPoolSettings(system), BorisSettings(system))
 
   /**
@@ -39,9 +40,11 @@ object RestClientFactory {
     * @param settings               Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
     * @return                       A client against which requests can be made
     */
-  def multiPoolClient(servers: Seq[Uri], connectionPoolSettings: ConnectionPoolSettings, settings: BorisSettings)(
-      implicit system: ActorSystem,
-      materializer: ActorMaterializer): RestRequests =
+  def multiPoolClient(
+      servers: Seq[Uri],
+      connectionPoolSettings: ConnectionPoolSettings,
+      settings: BorisSettings
+  )(implicit system: ActorSystem, materializer: Materializer): RestRequests =
     PooledMultiServerRequest(servers, connectionPoolSettings, settings)
 
   /**
@@ -52,7 +55,7 @@ object RestClientFactory {
     * @param servers   The list of servers URI
     * @return          A client against which requests can be made
     */
-  def multiPoolClient(servers: Seq[Uri])(implicit system: ActorSystem, materializer: ActorMaterializer): RestRequests =
+  def multiPoolClient(servers: Seq[Uri])(implicit system: ActorSystem, materializer: Materializer): RestRequests =
     multiPoolClient(servers, ConnectionPoolSettings(system), BorisSettings(system))
 
   /**
@@ -62,8 +65,10 @@ object RestClientFactory {
     * @param settings Boris rest client settings [[BorisSettings]], check `horn.boris` configuration.
     * @return         A client against which requests can be made.
     */
-  def singleClient(server: Uri, settings: BorisSettings)(implicit system: ActorSystem,
-                                                         materializer: ActorMaterializer): RestRequests =
+  def singleClient(server: Uri, settings: BorisSettings)(implicit
+      system: ActorSystem,
+      materializer: Materializer
+  ): RestRequests =
     SingleServerRequest(server, settings)
 
   /**
@@ -73,7 +78,7 @@ object RestClientFactory {
     * @param server   The server uri
     * @return         A client against which requests can be made
     */
-  def singleClient(server: Uri)(implicit system: ActorSystem, materializer: ActorMaterializer): RestRequests =
+  def singleClient(server: Uri)(implicit system: ActorSystem, materializer: Materializer): RestRequests =
     SingleServerRequest(server, BorisSettings(system))
 
 }

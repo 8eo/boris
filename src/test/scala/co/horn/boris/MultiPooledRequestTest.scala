@@ -12,7 +12,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.{ActorMaterializer, StreamTcpException}
+import akka.stream.{Materializer, StreamTcpException}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Milliseconds, Seconds, Span}
@@ -24,33 +24,34 @@ import scala.util.Try
 
 class MultiPooledRequestTest extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
 
-  implicit val system = ActorSystem("Test")
-  implicit val materializer = ActorMaterializer()
-  implicit val patience = PatienceConfig(timeout = Span(1000, Seconds), interval = Span(100, Milliseconds))
-  private val systemConfig = system.settings.config.getConfig("horn.boris")
+  implicit val system       = ActorSystem("Test")
+  implicit val materializer = Materializer(system)
+  implicit val patience     = PatienceConfig(timeout = Span(1000, Seconds), interval = Span(100, Milliseconds))
+  private val systemConfig  = system.settings.config.getConfig("horn.boris")
 
   // Very simple routing that just returns the current server instance
-  def route(instance: Int): Route = get {
-    path("bumble") {
-      complete(StatusCodes.OK, instance.toString)
-    } ~
-      path("slow") {
-        if (instance == 1) Thread.sleep(1000)
+  def route(instance: Int): Route =
+    get {
+      path("bumble") {
         complete(StatusCodes.OK, instance.toString)
       } ~
-      path("slow" / "very") {
-        Thread.sleep(1000)
-        complete(StatusCodes.OK, instance.toString)
-      } ~
-      path("slow" / "abit") {
-        Thread.sleep(50)
-        complete(StatusCodes.OK, instance.toString)
-      }
-  }
+        path("slow") {
+          if (instance == 1) Thread.sleep(1000)
+          complete(StatusCodes.OK, instance.toString)
+        } ~
+        path("slow" / "very") {
+          Thread.sleep(1000)
+          complete(StatusCodes.OK, instance.toString)
+        } ~
+        path("slow" / "abit") {
+          Thread.sleep(50)
+          complete(StatusCodes.OK, instance.toString)
+        }
+    }
 
-  private var servers = Seq[ServerBinding]()
+  private var servers   = Seq[ServerBinding]()
   private val instances = 0 until 5
-  private val uri = instances.map(i ⇒ Uri(s"http://localhost:${10100 + i}"))
+  private val uri       = instances.map(i ⇒ Uri(s"http://localhost:${10100 + i}"))
 
   override def beforeEach {
     Http(system).shutdownAllConnectionPools() // Terminate all pools so the servers can actually shut down
@@ -90,7 +91,8 @@ class MultiPooledRequestTest extends FunSpec with BeforeAndAfterEach with ScalaF
         PooledMultiServerRequest(
           Seq(Uri("http://localhost:10123"), Uri("http://localhost:10124"), Uri("http://localhost:10125")),
           ConnectionPoolSettings(system),
-          BorisSettings(system))
+          BorisSettings(system)
+        )
       pool
         .exec(Get("/bumble"))
         .flatMap(f ⇒ Unmarshal(f.entity).to[String])
@@ -105,7 +107,7 @@ class MultiPooledRequestTest extends FunSpec with BeforeAndAfterEach with ScalaF
           |  request-timeout = 0.5s
           |  materialize-timeout = 0.4s
         """.stripMargin).withFallback(systemConfig)
-      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(config))
+      val pool   = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(config))
       val ret = (0 until 20).map { _ ⇒
         pool.exec(Get("/slow")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }
@@ -138,7 +140,7 @@ class MultiPooledRequestTest extends FunSpec with BeforeAndAfterEach with ScalaF
 
     it("will fail when queue size is overrun") {
       val config = ConfigFactory.parseString("bufferSize = 10").withFallback(systemConfig)
-      val pool = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(config))
+      val pool   = PooledMultiServerRequest(uri, ConnectionPoolSettings(system), BorisSettings(config))
       val ret = (0 until 512).map { _ ⇒
         pool.exec(Get("/slow/abit")).flatMap(f ⇒ Unmarshal(f.entity).to[String])
       }

@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.QueueOfferResult.Enqueued
 import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.{Materializer, OverflowStrategy}
 import co.horn.boris.utils.StreamUtils
 
 import scala.concurrent.duration._
@@ -28,15 +28,15 @@ import scala.util.{Failure, Success}
   * @param materializer             A flow materializer
   */
 @throws(classOf[IllegalArgumentException])
-private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
-                                              poolSettings: ConnectionPoolSettings,
-                                              name: String,
-                                              requestTimeout: FiniteDuration,
-                                              strictMaterializeTimeout: FiniteDuration,
-                                              bufferSize: Int,
-                                              overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew)(
-    implicit val system: ActorSystem,
-    implicit val materializer: ActorMaterializer)
+private[boris] class PooledMultiServerRequest(
+    servers: Seq[Uri],
+    poolSettings: ConnectionPoolSettings,
+    name: String,
+    requestTimeout: FiniteDuration,
+    strictMaterializeTimeout: FiniteDuration,
+    bufferSize: Int,
+    overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew
+)(implicit val system: ActorSystem, implicit val materializer: Materializer)
     extends RestRequests {
 
   require(servers.nonEmpty, "Servers list cannot be empty.")
@@ -69,10 +69,11 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
   /**
     * @inheritdoc
     */
-  override def execDrop(req: HttpRequest): Future[HttpResponse] = execHelper(req).map { resp ⇒
-    resp.discardEntityBytes()
-    resp
-  }
+  override def execDrop(req: HttpRequest): Future[HttpResponse] =
+    execHelper(req).map { resp ⇒
+      resp.discardEntityBytes()
+      resp
+    }
 
   /**
     * @inheritdoc
@@ -87,17 +88,19 @@ private[boris] class PooledMultiServerRequest(servers: Seq[Uri],
       .offer(request -> promise)
       .flatMap {
         case Enqueued ⇒ promise.future
-        case other ⇒ Future.failed(EnqueueRequestFails(other))
+        case other    ⇒ Future.failed(EnqueueRequestFails(other))
       }
       .withTimeout(requestTimeout)
       .recoverWith {
         case t: Throwable if tries < pools.size ⇒
           system.log.warning(
-            s"Request to ${request.uri} failed: Failure was ${t.toString} with message ${t.getMessage}")
+            s"Request to ${request.uri} failed: Failure was ${t.toString} with message ${t.getMessage}"
+          )
           execHelper(request, tries + 1)
         case t: Throwable ⇒
           system.log.error(
-            s"Request to ${request.uri} failed (no servers available), : Failure was ${t.toString} with message ${t.getMessage}")
+            s"Request to ${request.uri} failed (no servers available), : Failure was ${t.toString} with message ${t.getMessage}"
+          )
           Future.failed(NoServersResponded(t))
       }
   }
@@ -113,15 +116,18 @@ object PooledMultiServerRequest {
     * @param settings     Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
     * @return PooledMultiServerRequest rest client
     */
-  def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings, settings: BorisSettings)(
-      implicit system: ActorSystem,
-      materializer: ActorMaterializer): PooledMultiServerRequest = {
-    new PooledMultiServerRequest(servers,
-                                 poolSettings,
-                                 settings.name,
-                                 settings.requestTimeout,
-                                 settings.strictMaterializeTimeout,
-                                 settings.bufferSize,
-                                 settings.overflowStrategy)
+  def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings, settings: BorisSettings)(implicit
+      system: ActorSystem,
+      materializer: Materializer
+  ): PooledMultiServerRequest = {
+    new PooledMultiServerRequest(
+      servers,
+      poolSettings,
+      settings.name,
+      settings.requestTimeout,
+      settings.strictMaterializeTimeout,
+      settings.bufferSize,
+      settings.overflowStrategy
+    )
   }
 }
