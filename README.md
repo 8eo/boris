@@ -15,7 +15,7 @@ are Akka streams.
 
 You can include it in your project by adding the following dependency:
 ```scala
-libraryDependencies += "co.horn" %% "boris" % "0.0.6"
+libraryDependencies += "co.horn" %% "boris" % "0.1.1"
 ```
 
 If there is sufficient interest from the community we will publish it on Maven Central.
