@@ -27,7 +27,6 @@ import scala.util.{Failure, Success}
   * @param system                   An actor system in which to execute the requests
   * @param materializer             A flow materializer
   */
-@throws(classOf[IllegalArgumentException])
 private[boris] class PooledMultiServerRequest(
     servers: Seq[Uri],
     poolSettings: ConnectionPoolSettings,
