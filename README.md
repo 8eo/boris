@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/8eo/boris.svg?branch=development)](https://travis-ci.org/8eo/boris)
-[![Coverage Status](https://coveralls.io/repos/github/8eo/boris/badge.svg?branch=development)](https://coveralls.io/github/8eo/boris?branch=development)
+## Build Status
+[![Build @horn/scopus](https://github.com/8eo/scopus/actions/workflows/push_main.yml/badge.svg)](https://github.com/8eo/scopus/actions/workflows/push_main.yml)
 [<img src="https://img.shields.io/badge/horn-%3EBoris%E2%80%85the%E2%80%85Blade-green.svg">](https://horn.co/%3EBoris%E2%80%85the%E2%80%85Blade)
 
 # Boris #

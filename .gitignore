@@ -1,33 +1,45 @@
+# bloop and metals
+.bloop
+.bsp
+.metals
+project/metals.sbt
+project/project/metals.sbt
+project/project/project/metals.sbt
+
+# vs code
+.vscode
+
+# scala 3
+.tasty
+
 # sbt
-lib_managed
-project/project
-target
+project/project/
+project/target/
+target/
 
-# Worksheets (Eclipse or IntelliJ)
-*.sc
-
-# Eclipse
-.cache*
+# eclipse
+build/
 .classpath
 .project
-.scala_dependencies
 .settings
-.target
 .worksheet
+bin/
+.cache
 
-# IntelliJ
+# intellij idea
+*.log
+*.iml
+*.ipr
+*.iws
 .idea
 
-# ENSIME
-.ensime
-.ensime_lucene
-
-# Mac
+# mac
 .DS_Store
 
-# Akka Persistence
-journal
-snapshots
+# other?
+.history
+.scala_dependencies
+.cache-main
 
-# Log files
-*.log
+# general
+*.class
