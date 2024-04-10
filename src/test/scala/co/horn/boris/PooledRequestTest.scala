@@ -13,13 +13,15 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Materializer
+import org.scalatest._
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Milliseconds, Seconds, Span}
-import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class PooledRequestTest() extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
+class PooledRequestTest() extends AnyFunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
 
   implicit val system       = ActorSystem("Test")
   implicit val materializer = Materializer(system)

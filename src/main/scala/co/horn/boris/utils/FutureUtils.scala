@@ -1,11 +1,10 @@
 package co.horn.boris.utils
 
-import java.util.concurrent.TimeoutException
-
 import akka.actor.ActorSystem
 
-import scala.concurrent.{ExecutionContext, Future}
+import java.util.concurrent.TimeoutException
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ExecutionContext, Future}
 
 object FutureUtils {
 
@@ -13,8 +12,12 @@ object FutureUtils {
 
     import akka.pattern.after
 
-    def withTimeout(timeout: FiniteDuration)(implicit system: ActorSystem, ec: ExecutionContext): Future[T] = {
-      Future.firstCompletedOf(future :: after(timeout, system.scheduler)(Future.failed(new TimeoutException)) :: Nil)
+    def withTimeout(timeout: FiniteDuration)(
+        implicit system: ActorSystem,
+        ec: ExecutionContext): Future[T] = {
+      Future.firstCompletedOf(
+        future :: after(timeout, system.scheduler)(
+          Future.failed(new TimeoutException)) :: Nil)
     }
   }
 

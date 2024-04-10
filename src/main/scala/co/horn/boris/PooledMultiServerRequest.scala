@@ -45,9 +45,14 @@ private[boris] class PooledMultiServerRequest(
   // A pool of Flows that will execute the HTTP requests via a connection pool
   private val pools = servers.map {
     case u if u.scheme == "https" ⇒
-      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](host(u), port(u), settings = poolSettings)
+      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](
+        host(u),
+        port(u),
+        settings = poolSettings)
     case u ⇒
-      Http().cachedHostConnectionPool[Promise[HttpResponse]](host(u), port(u), poolSettings)
+      Http().cachedHostConnectionPool[Promise[HttpResponse]](host(u),
+                                                             port(u),
+                                                             poolSettings)
   }
 
   private val queue = Source
@@ -77,17 +82,21 @@ private[boris] class PooledMultiServerRequest(
   /**
     * @inheritdoc
     */
-  override def execStrict(req: HttpRequest, timeout: Option[FiniteDuration] = None): Future[HttpResponse] =
-    execHelper(req).flatMap(_.toStrict(timeout.getOrElse(strictMaterializeTimeout)))
+  override def execStrict(
+      req: HttpRequest,
+      timeout: Option[FiniteDuration] = None): Future[HttpResponse] =
+    execHelper(req).flatMap(
+      _.toStrict(timeout.getOrElse(strictMaterializeTimeout)))
 
-  private def execHelper(request: HttpRequest, tries: Int = 0): Future[HttpResponse] = {
+  private def execHelper(request: HttpRequest,
+                         tries: Int = 0): Future[HttpResponse] = {
     import co.horn.boris.utils.FutureUtils.FutureWithTimeout
     val promise = Promise[HttpResponse]
     queue
       .offer(request -> promise)
       .flatMap {
         case Enqueued ⇒ promise.future
-        case other    ⇒ Future.failed(EnqueueRequestFails(other))
+        case other ⇒ Future.failed(EnqueueRequestFails(other))
       }
       .withTimeout(requestTimeout)
       .recoverWith {
@@ -115,10 +124,12 @@ object PooledMultiServerRequest {
     * @param settings     Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
     * @return PooledMultiServerRequest rest client
     */
-  def apply(servers: Seq[Uri], poolSettings: ConnectionPoolSettings, settings: BorisSettings)(implicit
+  def apply(servers: Seq[Uri],
+            poolSettings: ConnectionPoolSettings,
+            settings: BorisSettings)(
+      implicit
       system: ActorSystem,
-      materializer: Materializer
-  ): PooledMultiServerRequest = {
+      materializer: Materializer): PooledMultiServerRequest = {
     new PooledMultiServerRequest(
       servers,
       poolSettings,

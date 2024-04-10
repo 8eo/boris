@@ -10,7 +10,8 @@ object StreamUtils {
     * A Flow that balance and distribute the stream among some workers
     * @param workers Sequence of flows that will execute the given work
     */
-  def balancer[In, Out](workers: Seq[Flow[In, Out, Any]]): Flow[In, Out, NotUsed] = {
+  def balancer[In, Out](
+      workers: Seq[Flow[In, Out, Any]]): Flow[In, Out, NotUsed] = {
     import GraphDSL.Implicits._
 
     Flow.fromGraph(GraphDSL.create() { implicit b =>

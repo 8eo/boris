@@ -1,0 +1,37 @@
+name: Build @horn/boris
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build $ Push
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.HORN_ACTIONS_WORKER_TOKEN }}
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+      - name: Compile & Test
+        run: sbt test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish API github package repository
+        run: sbt +publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEPLOY_GITHUB_TOKEN }}
+      - name: Fetch version from build.sbt
+        id: current_version
+        run: echo "version=$(grep "version.*:=" build.sbt | sed 's/.*"\(.*\)"/\1/')" >> $GITHUB_OUTPUT
+      - uses: rickstaa/action-create-tag@v1
+        with:
+          tag: ${{ steps.current_version.outputs.version }}
+          tag_exists_error: false

@@ -12,17 +12,19 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.{Materializer, StreamTcpException}
+import akka.stream.Materializer
 import com.typesafe.config.ConfigFactory
+import org.scalatest._
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Milliseconds, Seconds, Span}
-import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.util.Try
 
-class MultiPooledRequestTest extends FunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
+class MultiPooledRequestTest extends AnyFunSpec with BeforeAndAfterEach with ScalaFutures with Matchers with Eventually {
 
   implicit val system       = ActorSystem("Test")
   implicit val materializer = Materializer(system)
@@ -99,7 +101,7 @@ class MultiPooledRequestTest extends FunSpec with BeforeAndAfterEach with ScalaF
         .failed
         .futureValue
         .asInstanceOf[NoServersResponded]
-        .cause shouldBe a[StreamTcpException]
+        .cause shouldBe a[TimeoutException]
     }
 
     it("handles servers that time out") {
