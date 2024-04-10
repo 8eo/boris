@@ -42,5 +42,6 @@ trait RestRequests {
     * @param req An HttpRequest
     * @return The response
     */
-  def execStrict(req: HttpRequest, timeout: Option[FiniteDuration] = None): Future[HttpResponse]
+  def execStrict(req: HttpRequest,
+                 timeout: Option[FiniteDuration] = None): Future[HttpResponse]
 }

@@ -1,13 +1,18 @@
 name := "boris"
 organization := "co.horn"
-scalaVersion := "2.13.8"
-crossScalaVersions := Seq("2.12.15", "2.13.8")
+scalaVersion := "2.13.12"
+crossScalaVersions := Seq("2.12.15", "2.13.12")
+
+semanticdbEnabled in ThisBuild := true
+semanticdbVersion in ThisBuild := scalafixSemanticdb.revision
+
 fork in Test := true
 
 scalacOptions ++= Seq(
   "-unchecked",
   "-deprecation",
   "-Ywarn-dead-code",
+  "-Ywarn-unused",
   "-encoding",
   "UTF-8",
   "-target:jvm-1.8",
@@ -15,7 +20,7 @@ scalacOptions ++= Seq(
   "-language:postfixOps"
 )
 
-publishTo := Some("GitHub Packages" at "https://maven.pkg.github.com/8eo/boris")
+publishTo := Some("Horn Packages" at "https://maven.pkg.github.com/8eo/boris")
 
 libraryDependencies ++= {
   val akkaHttpV  = "10.2.9"

@@ -29,7 +29,8 @@ private[boris] class SingleServerRequest(
 
   import system.dispatcher
 
-  private def setReq(req: HttpRequest): HttpRequest = req.withUri(server.withPath(req.uri.path))
+  private def setReq(req: HttpRequest): HttpRequest =
+    req.withUri(server.withPath(req.uri.path))
 
   /**
     * @inheritdoc
@@ -52,7 +53,9 @@ private[boris] class SingleServerRequest(
   /**
     * @inheritdoc
     */
-  override def execStrict(req: HttpRequest, timeout: Option[FiniteDuration] = None): Future[HttpResponse] =
+  override def execStrict(
+      req: HttpRequest,
+      timeout: Option[FiniteDuration] = None): Future[HttpResponse] =
     Http()
       .singleRequest(setReq(req))
       .flatMap(_.toStrict(timeout.getOrElse(strictMaterializeTimeout)))
@@ -69,10 +72,12 @@ object SingleServerRequest {
     * @param settings Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
     * @return PooledMultiServerRequest rest client
     */
-  def apply(server: Uri, settings: BorisSettings)(implicit
+  def apply(server: Uri, settings: BorisSettings)(
+      implicit
       system: ActorSystem,
-      materializer: Materializer
-  ): SingleServerRequest = {
-    new SingleServerRequest(server, settings.requestTimeout, settings.strictMaterializeTimeout)
+      materializer: Materializer): SingleServerRequest = {
+    new SingleServerRequest(server,
+                            settings.requestTimeout,
+                            settings.strictMaterializeTimeout)
   }
 }

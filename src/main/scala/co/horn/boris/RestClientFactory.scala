@@ -15,10 +15,12 @@ object RestClientFactory {
     * @param settings               Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
     * @return                       A client against which requests can be made
     */
-  def poolClient(server: Uri, connectionPoolSettings: ConnectionPoolSettings, settings: BorisSettings)(implicit
+  def poolClient(server: Uri,
+                 connectionPoolSettings: ConnectionPoolSettings,
+                 settings: BorisSettings)(
+      implicit
       system: ActorSystem,
-      materializer: Materializer
-  ): RestRequests =
+      materializer: Materializer): RestRequests =
     PooledSingleServerRequest(server, connectionPoolSettings, settings)
 
   /**
@@ -27,7 +29,8 @@ object RestClientFactory {
     * @param server The server uri
     * @return                       A client against which requests can be made
     */
-  def poolClient(server: Uri)(implicit system: ActorSystem, materializer: Materializer): RestRequests =
+  def poolClient(server: Uri)(implicit system: ActorSystem,
+                              materializer: Materializer): RestRequests =
     poolClient(server, ConnectionPoolSettings(system), BorisSettings(system))
 
   /**
@@ -55,8 +58,12 @@ object RestClientFactory {
     * @param servers   The list of servers URI
     * @return          A client against which requests can be made
     */
-  def multiPoolClient(servers: Seq[Uri])(implicit system: ActorSystem, materializer: Materializer): RestRequests =
-    multiPoolClient(servers, ConnectionPoolSettings(system), BorisSettings(system))
+  def multiPoolClient(servers: Seq[Uri])(
+      implicit system: ActorSystem,
+      materializer: Materializer): RestRequests =
+    multiPoolClient(servers,
+                    ConnectionPoolSettings(system),
+                    BorisSettings(system))
 
   /**
     * Construct a simple connection to a single client using a separate connection for each request.
@@ -65,10 +72,10 @@ object RestClientFactory {
     * @param settings Boris rest client settings [[BorisSettings]], check `horn.boris` configuration.
     * @return         A client against which requests can be made.
     */
-  def singleClient(server: Uri, settings: BorisSettings)(implicit
+  def singleClient(server: Uri, settings: BorisSettings)(
+      implicit
       system: ActorSystem,
-      materializer: Materializer
-  ): RestRequests =
+      materializer: Materializer): RestRequests =
     SingleServerRequest(server, settings)
 
   /**
@@ -78,7 +85,8 @@ object RestClientFactory {
     * @param server   The server uri
     * @return         A client against which requests can be made
     */
-  def singleClient(server: Uri)(implicit system: ActorSystem, materializer: Materializer): RestRequests =
+  def singleClient(server: Uri)(implicit system: ActorSystem,
+                                materializer: Materializer): RestRequests =
     SingleServerRequest(server, BorisSettings(system))
 
 }

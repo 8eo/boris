@@ -5,20 +5,21 @@ package co.horn.boris
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.Uri
-import akka.stream.OverflowStrategy
+import akka.stream.{Materializer, OverflowStrategy}
 import co.horn.boris
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.{Milliseconds, Seconds, Span}
-import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.util.Try
 
-class BorisSettingsTest extends FunSpec with ScalaFutures with Matchers {
+class BorisSettingsTest extends AnyFunSpec with ScalaFutures with Matchers {
 
   implicit val system       = ActorSystem("Test")
-  implicit val materializer = Materializer()
+  implicit val materializer = Materializer(system)
   implicit val patience     = PatienceConfig(timeout = Span(10, Seconds), interval = Span(100, Milliseconds))
   private val systemConfig  = system.settings.config.getConfig("horn.boris")
 

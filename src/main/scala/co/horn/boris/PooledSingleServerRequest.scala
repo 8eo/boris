@@ -44,9 +44,14 @@ private[boris] class PooledSingleServerRequest(
 
   private val pool =
     if (server.scheme == "https") {
-      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](host(server), port(server), settings = poolSettings)
+      Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](
+        host(server),
+        port(server),
+        settings = poolSettings)
     } else {
-      Http().cachedHostConnectionPool[Promise[HttpResponse]](host(server), port(server), poolSettings)
+      Http().cachedHostConnectionPool[Promise[HttpResponse]](host(server),
+                                                             port(server),
+                                                             poolSettings)
     }
 
   private val queue = Source
@@ -88,8 +93,11 @@ private[boris] class PooledSingleServerRequest(
     * @param req An HttpRequest
     * @return The response
     */
-  override def execStrict(req: HttpRequest, timeout: Option[FiniteDuration] = None): Future[HttpResponse] =
-    execHelper(req).flatMap(_.toStrict(timeout.getOrElse(strictMaterializeTimeout)))
+  override def execStrict(
+      req: HttpRequest,
+      timeout: Option[FiniteDuration] = None): Future[HttpResponse] =
+    execHelper(req).flatMap(
+      _.toStrict(timeout.getOrElse(strictMaterializeTimeout)))
 
   private def execHelper(request: HttpRequest): Future[HttpResponse] = {
     import co.horn.boris.utils.FutureUtils.FutureWithTimeout
@@ -98,7 +106,7 @@ private[boris] class PooledSingleServerRequest(
       .offer(request -> promise)
       .flatMap {
         case Enqueued ⇒ promise.future
-        case other    ⇒ Future.failed(EnqueueRequestFails(other))
+        case other ⇒ Future.failed(EnqueueRequestFails(other))
       }
       .withTimeout(requestTimeout)
   }
@@ -114,10 +122,12 @@ object PooledSingleServerRequest {
     * @param settings Boris rest client settings [[BorisSettings]], check `horn.boris` configuration
     * @return PooledMultiServerRequest rest client
     */
-  def apply(server: Uri, poolSettings: ConnectionPoolSettings, settings: BorisSettings)(implicit
+  def apply(server: Uri,
+            poolSettings: ConnectionPoolSettings,
+            settings: BorisSettings)(
+      implicit
       system: ActorSystem,
-      materializer: Materializer
-  ): PooledSingleServerRequest = {
+      materializer: Materializer): PooledSingleServerRequest = {
     new PooledSingleServerRequest(
       server,
       poolSettings,
