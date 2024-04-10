@@ -28,7 +28,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.DEPLOY_GITHUB_TOKEN }}
       - name: Fetch version from build.sbt
         id: current_version
-        run: echo "version=$(grep "version.*:=" build.sbt | sed 's/.*"\(.*\)"/\1/')" >> $GITHUB_OUTPUT
+        run: echo "version=$(grep "version.*:=" version.sbt | sed 's/.*"\(.*\)"/\1/')" >> $GITHUB_OUTPUT
       - uses: rickstaa/action-create-tag@v1
         with:
           tag: ${{ steps.current_version.outputs.version }}
